@@ -36,6 +36,16 @@
 
 不過到了那個時候，我得把 Engine 和 Runtime 徹底分開，這恐怕會很麻煩……所以就如上述，是**「有機會」**而非保證。
 
+以下是近期目標:
+加入sqlite的支援還有某種zip的解決方案，和一些額外的添加物，為了增添風味。
+圖片載入的功能，但不是libpng、libjpg，他不夠全能。
+glm或是其他數學庫
+
+以下是遠期目標:
+音訊。
+https和websocket支持。
+Engine, Runtime separate.
+
 ---
 
 ## 建置方式
@@ -50,5 +60,18 @@ make linux
 # 執行
 ./build/Girigara
 ```
+
+一點額外事項，在這個版本中，我修改了makefile，所以我想之後你應該可以直接在windows編譯了，不過依賴的部分你得自己編譯，然後放到環境變數中CPATH和LIBRARY_PATH所在的位置。
+或是我想你的包管理器可以替你完成這件事情，以下是使用的host是Windows 11 + mingw-w64
+
+```bash
+# 編譯並建置專案
+make
+
+# 執行
+.\build\Girigara
+```
+
+對，就這麼簡單，我做了點判斷，現在他會看你的電腦是Windows嗎?但我沒考慮過都不是的部分。還請見諒。
 
 

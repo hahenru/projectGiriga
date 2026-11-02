@@ -1,11 +1,24 @@
 # ==========================================
+# 跨平台作業系統環境偵測
+# ==========================================
+ifeq ($(OS),Windows_NT)
+    HOST_OS = Windows
+    DEFAULT_GOAL = win64-native
+else
+    HOST_OS = Linux
+    DEFAULT_GOAL = all
+endif
+
+.DEFAULT_GOAL := $(DEFAULT_GOAL)
+
+# ==========================================
 # 原生 Linux 工具鏈與旗標
 # ==========================================
 CXX = g++
 CC = gcc
-CXXFLAGS = -g -std=c++23 -I./include $(shell pkg-config --cflags freetype2)
+CXXFLAGS = -g -std=c++23 -I./include $(shell pkg-config --cflags freetype2 2>/dev/null)
 CFLAGS = -g -I./include
-LDFLAGS = -lglfw -lGL -ldl -llua -lpthread $(shell pkg-config --libs freetype2)
+LDFLAGS = -lglfw -lGL -ldl -llua -lpthread $(shell pkg-config --libs freetype2 2>/dev/null)
 
 BUILD_DIR = build
 ASSETS_DIR = assets
@@ -13,7 +26,7 @@ TARGET = $(BUILD_DIR)/projectGIRIGARA
 PACKAGE_LINUX = $(BUILD_DIR)/ProjectGirigara_linux.tar.gz
 
 # ==========================================
-# MinGW-w64 Windows 交叉編譯設定
+# MinGW-w64 Windows 交叉編譯設定 (由 Linux 端執行)
 # ==========================================
 WIN_CXX = x86_64-w64-mingw32-g++
 WIN_CC  = x86_64-w64-mingw32-gcc
@@ -21,7 +34,7 @@ WIN_AR  = x86_64-w64-mingw32-ar
 WIN_PREFIX = /usr/x86_64-w64-mingw32/sys-root/mingw
 WIN_LIB_DIR = ./libs/win64
 
-# Vendor Lua 相關路徑
+# Vendor Lua 相關路徑 (交叉編譯建置用)
 LUA_DIR = vendor/lua-5.5.1
 LUA_SRC_DIR = $(LUA_DIR)/src
 WIN_LUA_BUILD_DIR = $(BUILD_DIR)/win64_lua
@@ -46,6 +59,20 @@ WIN_TARGET = $(WIN_BUILD_DIR)/projectGIRIGARA.exe
 PACKAGE_WIN = $(BUILD_DIR)/ProjectGirigara_win64.zip
 
 # ==========================================
+# 原生 Windows (MinGW-w64) 編譯設定 (由 Windows 端執行)
+# ==========================================
+WIN_NAT_CXX = g++
+WIN_NAT_CC  = gcc
+WIN_NAT_CXXFLAGS = -g -std=c++23 -I./include
+WIN_NAT_CFLAGS   = -g -I./include
+WIN_NAT_LDFLAGS  = -mwindows -Wl,--subsystem,windows \
+    -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread
+
+WIN_NAT_BUILD_DIR = $(BUILD_DIR)\win64_native
+WIN_NAT_TARGET    = $(WIN_NAT_BUILD_DIR)\projectGIRIGARA.exe
+PACKAGE_WIN_NAT   = $(BUILD_DIR)\ProjectGirigara_win64_native.zip
+
+# ==========================================
 # 專案主程式原始碼
 # ==========================================
 SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
@@ -56,17 +83,22 @@ SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
       src/ScriptBindings.cpp src/ScriptResource.cpp src/ConsoleSystem.cpp \
       src/FontLoader.cpp src/UIVerticalLayout.cpp src/UISlantedLayout.cpp
 
+# Linux / 交叉編譯目標檔路徑
 OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
        $(patsubst src/%.c, $(BUILD_DIR)/%.o, $(filter %.c, $(SRC)))
 
 WIN_OBJS = $(patsubst src/%.cpp, $(WIN_BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
            $(patsubst src/%.c, $(WIN_BUILD_DIR)/%.o, $(filter %.c, $(SRC)))
 
-# 預設建置：Linux 與 Windows 同時編譯打包
+# Windows 原生編譯目標檔路徑
+WIN_NAT_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
+               $(patsubst src/%.c, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.c, $(SRC)))
+
+# Linux 預設總建置目標
 all: linux win64 rpm flatpak
 
 # ==========================================
-# Linux 建置流程
+# Linux 原生建置流程
 # ==========================================
 linux: $(TARGET) copy_assets_linux clean_linux_objs package_linux
 
@@ -94,11 +126,10 @@ package_linux: $(TARGET) copy_assets_linux
 	@tar -czf $(PACKAGE_LINUX) -C $(BUILD_DIR) $(notdir $(TARGET)) $(ASSETS_DIR)
 
 # ==========================================
-# Windows 交叉編譯流程
+# Windows 交叉編譯流程 (在 Linux 主機上執行)
 # ==========================================
 win64: $(WIN_LUA_LIB) $(WIN_TARGET) copy_assets_win clean_win_objs package_win
 
-# 1. 自動交叉編譯 vendor 中的 Lua 核心並打包成 liblua.a
 $(WIN_LUA_LIB): $(WIN_LUA_OBJS)
 	@echo "==> 打包 Windows 靜態庫 $(WIN_LUA_LIB) ..."
 	$(WIN_AR) rcs $@ $(WIN_LUA_OBJS)
@@ -109,7 +140,6 @@ $(WIN_LUA_BUILD_DIR)/%.o: $(LUA_SRC_DIR)/%.c | $(WIN_LUA_BUILD_DIR)
 $(WIN_LUA_BUILD_DIR):
 	mkdir -p $(WIN_LUA_BUILD_DIR)
 
-# 2. 編譯主程式並靜態鏈結
 $(WIN_TARGET): $(WIN_OBJS) $(WIN_LUA_LIB) | $(WIN_BUILD_DIR)
 	@echo "==> 靜態鏈結 $(WIN_TARGET) ..."
 	$(WIN_CXX) $(WIN_OBJS) -o $@ $(WIN_LDFLAGS)
@@ -139,12 +169,46 @@ package_win: $(WIN_TARGET) copy_assets_win
 	@cd $(WIN_BUILD_DIR) && zip -rq ../../$(PACKAGE_WIN) .
 	@echo "==> Windows x86_64 發布包打包完成！"
 
+# ==========================================
+# Windows 原生編譯流程 (在 Windows 主機 CMD 下執行)
+# ==========================================
+win64-native: $(WIN_NAT_TARGET) copy_assets_win_nat clean_win_nat_objs package_win_nat
+
+$(WIN_NAT_TARGET): $(WIN_NAT_OBJS) | $(WIN_NAT_BUILD_DIR)
+	@echo [LD] 連結 $@ ...
+	$(WIN_NAT_CXX) $(WIN_NAT_OBJS) -o $@ $(WIN_NAT_LDFLAGS)
+
+$(WIN_NAT_BUILD_DIR)/%.o: src/%.cpp | $(WIN_NAT_BUILD_DIR)
+	@echo [CXX] $<
+	$(WIN_NAT_CXX) $(WIN_NAT_CXXFLAGS) -c $< -o $@
+
+$(WIN_NAT_BUILD_DIR)/%.o: src/%.c | $(WIN_NAT_BUILD_DIR)
+	@echo [CC] $<
+	$(WIN_NAT_CC) $(WIN_NAT_CFLAGS) -c $< -o $@
+
+$(WIN_NAT_BUILD_DIR):
+	@if not exist $(WIN_NAT_BUILD_DIR) mkdir $(WIN_NAT_BUILD_DIR)
+
+copy_assets_win_nat: | $(WIN_NAT_BUILD_DIR)
+	@echo [ASSETS] 複製 assets 資料夾...
+	@if exist $(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR) rmdir /S /Q $(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)
+	@xcopy /E /I /Q /Y $(ASSETS_DIR) $(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR) >nul
+
+clean_win_nat_objs:
+	@echo [CLEAN] 清理 Windows 原生中間暫存檔 (*.o)...
+	@if exist $(WIN_NAT_BUILD_DIR)\*.o del /Q $(WIN_NAT_BUILD_DIR)\*.o
+
+package_win_nat: $(WIN_NAT_TARGET) copy_assets_win_nat
+	@echo [PACKAGE] 打包 Windows 發布包至 $(PACKAGE_WIN_NAT) ...
+	@if exist $(PACKAGE_WIN_NAT) del /Q $(PACKAGE_WIN_NAT)
+	@tar -a -c -f $(PACKAGE_WIN_NAT) -C $(WIN_NAT_BUILD_DIR) $(notdir $(WIN_NAT_TARGET)) $(ASSETS_DIR)
+	@echo [OK] Windows 原生發布包打包完成！
 
 # 版本號與前綴
 VERSION = 0.1.0
 
 # ==========================================
-# RPM 打包目標
+# RPM 打包目標 (Linux 專用)
 # ==========================================
 rpm:
 	@mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPECS
@@ -159,14 +223,12 @@ FLATPAK_REPO = repo
 FLATPAK_BUNDLE = $(BUILD_DIR)/$(FLATPAK_ID).flatpak
 
 # ==========================================
-# Flatpak 打包目標
+# Flatpak 打包目標 (Linux 專用)
 # ==========================================
-# 1. 本地編譯並直接安裝至使用者環境 (方便本機測試)
 flatpak-install:
 	@echo "==> 使用 flatpak-builder 編譯並安裝到本地..."
 	flatpak-builder --user --install --force-clean $(FLATPAK_BUILD_DIR) $(FLATPAK_MANIFEST)
 
-# 2. 編譯並輸出單一離線安裝包 (.flatpak bundle)
 flatpak: | $(BUILD_DIR)
 	@echo "==> 編譯 Flatpak 儲存庫..."
 	flatpak-builder --repo=$(FLATPAK_REPO) --force-clean $(FLATPAK_BUILD_DIR) $(FLATPAK_MANIFEST)
@@ -175,10 +237,17 @@ flatpak: | $(BUILD_DIR)
 	@echo "==> Flatpak 打包完成！"
 
 # ==========================================
-# 清理規則
+# 清理規則 (跨平台相容)
 # ==========================================
 clean:
-	rm -rf $(BUILD_DIR) $(BUILD_DIR) $(FLATPAK_BUILD_DIR) $(FLATPAK_REPO)
+ifeq ($(HOST_OS),Windows)
+	@echo ==> 清理建置輸出目錄 (Windows)...
+	@if exist $(BUILD_DIR) rmdir /S /Q $(BUILD_DIR)
+else
+	@echo "==> 清理建置輸出目錄 (Linux)..."
+	rm -rf $(BUILD_DIR) $(FLATPAK_BUILD_DIR) $(FLATPAK_REPO)
+endif
 
-.PHONY: all linux win64 copy_assets_linux clean_linux_objs package_linux \
-        copy_assets_win clean_win_objs package_win clean rpm flatpak flatpak-install
+.PHONY: all linux win64 win64-native copy_assets_linux clean_linux_objs package_linux \
+        copy_assets_win clean_win_objs package_win copy_assets_win_nat clean_win_nat_objs \
+        package_win_nat clean rpm flatpak flatpak-install
