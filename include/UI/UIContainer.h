@@ -40,6 +40,16 @@ public:
     // ★ 取得子節點列表，供視窗縮放時遍歷校正
     const std::vector<std::unique_ptr<UIElement>>& getChildren() const { return m_children; }
     void bringToFront(UIElement* element);
+	
+	// ★ 覆寫：容器自身位移時，通知所有子節點
+    void markTransformDirty() override;
+
+    // ★ 標記結構變更（子節點新增、刪除、順序調整）
+    void markHierarchyDirty() { m_isHierarchyDirty = true; }
+    bool isHierarchyDirty() const { return m_isHierarchyDirty; }
+    void clearHierarchyDirty() { m_isHierarchyDirty = false; }
+
+    void setClipToBounds(bool clip) { m_clipToBounds = clip; }
 
 protected:
     std::vector<std::unique_ptr<UIElement>> m_children;
@@ -48,6 +58,7 @@ private:
     UIElement* m_focusedElement = nullptr;
     bool m_passThrough = false; // ★ 是否讓未被子元件處理的事件穿透
     bool m_clipToBounds = false;
+	bool m_isHierarchyDirty = true; // ★ 節點樹結構是否改變
 };
 
 #endif // GIRIGARA_UI_UI_CONTAINER_H

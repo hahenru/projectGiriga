@@ -82,6 +82,11 @@ public:
     // 命中測試
     virtual bool contains(double x, double y) const;
     virtual bool canBringToFront() const { return false; }
+	
+	// ★ 虛擬標髒介面：供 Container 覆寫以向下傳播
+    virtual void markTransformDirty();
+    bool isTransformDirty() const { return m_isTransformDirty; }
+
 
 protected:
     UIElement();
@@ -94,6 +99,13 @@ protected:
     float m_y = 0.0f;
     float m_width = 0.0f;
     float m_height = 0.0f;
+	
+	// ★ 關鍵：mutable 允許在 const 函式 (getGlobalX/Y) 內部延遲更新快取
+    mutable bool  m_isTransformDirty = true;
+    mutable float m_cachedGlobalX    = 0.0f;
+    mutable float m_cachedGlobalY    = 0.0f;
+
+    void updateGlobalTransform() const;
 
     UIUnit m_posUnit  = UIUnit::Pixels;
     UIUnit m_sizeUnit = UIUnit::Pixels;

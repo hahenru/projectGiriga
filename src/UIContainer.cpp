@@ -5,14 +5,17 @@
 
 void UIContainer::addChild(std::unique_ptr<UIElement> child) {
     if (child) {
-        child->setParent(this); // ★ 設置父節點
+        child->setParent(this);
+        child->markTransformDirty(); // 剛加入時確保重新計算世界座標
         m_children.push_back(std::move(child));
+        markHierarchyDirty();        // ★ 標記樹結構變更
     }
 }
 
 void UIContainer::clear() {
     m_focusedElement = nullptr;
     m_children.clear();
+    markHierarchyDirty();            // ★ 標記樹結構變更
 }
 
 void UIContainer::setFocusedElement(UIElement* element) {
@@ -44,13 +47,16 @@ void UIContainer::render(const Shader& shader) {
     bool clip = m_clipToBounds && (getWidth() > 0.0f && getHeight() > 0.0f);
     if (clip) {
         glEnable(GL_SCISSOR_TEST);
-        // 注意 OpenGL 視窗座標原點在左下角，需用視窗高度換算 Y
+		// 注意 OpenGL 視窗座標原點在左下角，需用視窗高度換算 Y
         int winW, winH;
         glfwGetFramebufferSize(glfwGetCurrentContext(), &winW, &winH);
+
+        // 這裡調用 getGlobalX/Y 時，若無位移直接回傳快取值，零運算成本
         float gx = getGlobalX();
         float gy = getGlobalY();
         float gw = getLocalWidth();
         float gh = getLocalHeight();
+        
         glScissor(static_cast<GLint>(gx),
                   static_cast<GLint>(winH - (gy + gh)),
                   static_cast<GLsizei>(gw),
@@ -58,14 +64,18 @@ void UIContainer::render(const Shader& shader) {
     }
 
     for (auto& child : m_children) {
-        if (child && child->isVisible()) child->render(shader);
+        if (child && child->isVisible()) {
+            child->render(shader);
+        }
     }
 
     if (clip) {
         glDisable(GL_SCISSOR_TEST);
     }
-}
 
+    // 渲染完成後清除結構髒標記
+    clearHierarchyDirty();
+}
 bool UIContainer::handleMouseMove(double x, double y) {
     if (!isVisible()) return false;
 
@@ -147,6 +157,16 @@ void UIContainer::bringToFront(UIElement* element) {
         auto target = std::move(*it);
         m_children.erase(it);
         m_children.push_back(std::move(target));
+        markHierarchyDirty();        // ★ 渲染順序改變，標記髒
+    }
+}
+
+void UIContainer::markTransformDirty() {
+    UIElement::markTransformDirty();
+    for (auto& child : m_children) {
+        if (child) {
+            child->markTransformDirty(); // 遞迴標記所有子節點
+        }
     }
 }
 

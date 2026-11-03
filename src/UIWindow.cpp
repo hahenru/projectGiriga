@@ -68,6 +68,7 @@ void UIWindow::setTitle(std::unique_ptr<UIText> titleText) {
 void UIWindow::setPosition(float x, float y) {
     m_x = x;
     m_y = y;
+	markTransformDirty(); // ★ 補上標髒
 }
 
 bool UIWindow::isInsideTitleBar(double x, double y) const {
@@ -144,6 +145,9 @@ bool UIWindow::handleMouseMove(double x, double y) {
         m_x = static_cast<float>(x - m_dragOffsetX);
         m_y = static_cast<float>(y - m_dragOffsetY);
 
+		/**
+		* TODO: 之後要把這個hard code移除掉，滑鼠的檢查，直接走Event System.
+		*/
         GLFWwindow* currentContext = glfwGetCurrentContext();
         int winW = 800, winH = 600;
         if (currentContext) {
@@ -151,6 +155,10 @@ bool UIWindow::handleMouseMove(double x, double y) {
         }
 
         clampPosition(static_cast<float>(winW), static_cast<float>(winH));
+		
+		// ★ 核心修復：座標更新後立即標記髒，通知渲染管線與所有子元件重算全局座標！
+        markTransformDirty();
+		
         return true;
     }
 
@@ -209,4 +217,13 @@ bool UIWindow::handleKey(int key, int /*scancode*/, int action, int /*mods*/) {
     }
 
     return m_container.handleKey(key, 0, action, 0);
+}
+
+void UIWindow::markTransformDirty() {
+    UIElement::markTransformDirty(); // 先標記自己
+
+    // 同步標記內部持有的一體化元件
+    if (m_titleText)   m_titleText->markTransformDirty();
+    if (m_closeButton) m_closeButton->markTransformDirty();
+    m_container.markTransformDirty();
 }

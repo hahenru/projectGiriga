@@ -29,28 +29,33 @@ void UIElement::setVisible(bool visible) {
     }
 }
 
+// 在數值變更時標髒（包含百分比與固定像素）
 void UIElement::setPosition(float x, float y) {
     m_x = x;
     m_y = y;
     m_posUnit = UIUnit::Pixels;
+    markTransformDirty();
 }
 
 void UIElement::setSize(float width, float height) {
     m_width = width;
     m_height = height;
     m_sizeUnit = UIUnit::Pixels;
+    markTransformDirty();
 }
 
 void UIElement::setPositionPercent(float xPercent, float yPercent) {
     m_x = xPercent;
     m_y = yPercent;
     m_posUnit = UIUnit::Percent;
+    markTransformDirty();
 }
 
 void UIElement::setSizePercent(float wPercent, float hPercent) {
     m_width = wPercent;
     m_height = hPercent;
     m_sizeUnit = UIUnit::Percent;
+    markTransformDirty();
 }
 
 float UIElement::getLocalWidth() const {
@@ -82,11 +87,13 @@ float UIElement::getLocalY() const {
 }
 
 float UIElement::getGlobalX() const {
-    return getLocalX() + (m_parent ? m_parent->getGlobalX() : 0.0f);
+    updateGlobalTransform();
+    return m_cachedGlobalX;
 }
 
 float UIElement::getGlobalY() const {
-    return getLocalY() + (m_parent ? m_parent->getGlobalY() : 0.0f);
+    updateGlobalTransform();
+    return m_cachedGlobalY;
 }
 
 bool UIElement::contains(double x, double y) const {
@@ -121,4 +128,22 @@ void UIElement::onUpdate(float dt) {
             lua_pop(L, 1);
         }
     }
+}
+
+// 核心快取計算：只在需要時更新，且相容原本的 getLocalX()
+void UIElement::updateGlobalTransform() const {
+    if (m_isTransformDirty) {
+        float parentGX = m_parent ? m_parent->getGlobalX() : 0.0f;
+        float parentGY = m_parent ? m_parent->getGlobalY() : 0.0f;
+
+        // 直接調用你原本寫好的 getLocalX() / getLocalY()，百分比計算完全相容
+        m_cachedGlobalX = getLocalX() + parentGX;
+        m_cachedGlobalY = getLocalY() + parentGY;
+
+        m_isTransformDirty = false;
+    }
+}
+
+void UIElement::markTransformDirty() {
+    m_isTransformDirty = true;
 }

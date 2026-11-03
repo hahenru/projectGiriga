@@ -48,6 +48,7 @@ public:
     // ★ 主動將視窗位置約束在螢幕可見區域內
     void clampPosition(float screenW, float screenH);
     bool canBringToFront() const override { return true; }
+	void markTransformDirty() override;
 
 private:
     float m_titleBarHeight = 35.0f;
