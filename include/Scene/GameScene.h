@@ -3,6 +3,7 @@
 
 #include <Scene/Scene.h>
 #include <UI/UIWindow.h>
+#include <memory>
 
 class GameScene : public Scene {
 public:
@@ -11,6 +12,9 @@ public:
 
     void onEnter() override;
     void onExit() override;
+    void renderWorld() override {}
+
+    std::unique_ptr<UIContainer> createUI() override;
 
 private:
     UIWindow* m_consoleWindow = nullptr;

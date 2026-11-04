@@ -13,6 +13,9 @@ enum class UIUnit {
     Percent  // 百分比 (100.0f 代表 100%, 0.01f 代表 0.01%)
 };
 
+// 前置宣告
+class UIRenderer;
+
 class UIElement : public Core::Identifiable {
 public:
     virtual ~UIElement();
@@ -25,7 +28,7 @@ public:
     // 覆寫 setName 以同步更新 UIRegistry 的名稱映射
     void setName(const std::string& name) override;
 
-    virtual void render(const Shader& shader) = 0;
+	virtual void render(UIRenderer& renderer) = 0;
     virtual bool handleMouseMove(double x, double y) = 0;
     virtual bool handleMouseButton(int button, int action, int mods, double x, double y) = 0;
 

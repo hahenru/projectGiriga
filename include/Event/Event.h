@@ -1,6 +1,9 @@
 #ifndef GIRIGARA_EVENT_EVENT_H
 #define GIRIGARA_EVENT_EVENT_H
 
+#include <UI/UIContainer.h>
+#include <memory>
+
 // 基礎事件類別
 class Event {
 public:
@@ -93,6 +96,15 @@ public:
 
     int width;
     int height;
+};
+
+// 當前場景 UI 樹變更事件（所有權直接移交）
+class SceneUIChangedEvent : public Event {
+public:
+    explicit SceneUIChangedEvent(std::unique_ptr<UIContainer> newUI)
+        : uiTree(std::move(newUI)) {}
+
+    std::unique_ptr<UIContainer> uiTree;
 };
 
 #endif // GIRIGARA_EVENT_EVENT_H

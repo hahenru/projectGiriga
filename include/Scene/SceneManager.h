@@ -3,12 +3,12 @@
 
 #include <Scene/Scene.h>
 #include <Event/EventBus.h>
+#include <Event/Event.h>
 #include <Resource/ResourceManager.h>
 #include <System/LoggerSystem.h>
-#include <UI/UIContainer.h>
 #include <memory>
-#include <utility>
 #include <functional>
+#include <utility>
 
 class SceneManager {
 public:
@@ -17,8 +17,10 @@ public:
 
     SceneManager(const SceneManager&) = delete;
     SceneManager& operator=(const SceneManager&) = delete;
+    SceneManager(SceneManager&&) noexcept = default;
+    SceneManager& operator=(SceneManager&&) noexcept = default;
 
-    // ★ 關鍵：switchScene 只排程切換，不立刻銷毀當前場景
+    // 模板工廠閉包：排程場景建立，並透過 EventBus 廣播 UI 樹移交
     template <typename T, typename... Args>
     void switchScene(Args&&... args) {
         m_pendingSceneFactory = [this, ...capturedArgs = std::forward<Args>(args)]() mutable {
@@ -26,27 +28,28 @@ public:
                 m_currentScene->onExit();
             }
             m_currentScene = std::make_unique<T>(*this, m_bus, m_resources, m_logger, std::move(capturedArgs)...);
+
+            // 提取新場景的 UI 樹並透過事件通知 UIManager 接管
+            auto sceneUI = m_currentScene->createUI();
+            m_bus.publish(SceneUIChangedEvent{ std::move(sceneUI) });
+
             m_currentScene->onEnter();
         };
     }
 
     void update(float dt);
-    void render(const Shader& shader);
 
-    UIContainer& getGlobalUI() { return m_globalUI; }
     Scene* getCurrentScene() const { return m_currentScene.get(); }
 
 private:
     void applyPendingScene();
-    void registerEventHandlers();
 
     EventBus& m_bus;
     ResourceManager& m_resources;
     LoggerSystem& m_logger;
 
     std::unique_ptr<Scene> m_currentScene{nullptr};
-    std::function<void()> m_pendingSceneFactory{nullptr}; // ★ 待切換場景的工廠閉包
-    UIContainer m_globalUI;
+    std::function<void()> m_pendingSceneFactory{nullptr};
 };
 
 #endif // GIRIGARA_SCENE_SCENE_MANAGER_H

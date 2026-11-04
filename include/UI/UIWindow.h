@@ -40,7 +40,7 @@ public:
     void setCloseOnEsc(bool enable) { m_closeOnEsc = enable; }
     bool isCloseOnEscEnabled() const { return m_closeOnEsc; }
 
-    void render(const Shader& shader) override;
+    void render(UIRenderer& renderer) override;
     bool handleMouseMove(double x, double y) override;
     bool handleMouseButton(int button, int action, int mods, double x, double y) override;
     bool handleKey(int key, int scancode, int action, int mods) override;

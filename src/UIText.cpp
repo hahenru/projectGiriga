@@ -1,10 +1,6 @@
 #include <UI/UIText.h>
+#include <Renderer/UIRenderer.h>
 
-namespace {
-    constexpr GLint LOC_MODEL    = 1;
-    constexpr GLint LOC_UI_COLOR = 2;
-    constexpr GLint LOC_IS_TEXT  = 3;
-}
 
 UIText::UIText(float x, float y, const FontLoader& font, const std::u32string& text, unsigned int fontSize)
 : UIElement(x, y, 0.0f, 0.0f), m_font(font), m_text(text), m_targetFontSize(fontSize) {
@@ -86,28 +82,16 @@ void UIText::rebake() {
     updateMetrics();
 }
 
-void UIText::render(const Shader& shader) {
+void UIText::render(UIRenderer& renderer) {
     if (!m_visible || !m_texture || m_width <= 0.0f || m_height <= 0.0f) return;
 
-    glProgramUniform1i(shader.getID(), LOC_IS_TEXT, 1);
-    glProgramUniform4fv(shader.getID(), LOC_UI_COLOR, 1, m_color);
-
-    // ★ 關鍵修正：必須使用全局座標，文字才會跟著父容器（視窗）平移！
-    float gw = getLocalWidth();
-    float gh = getLocalHeight();
-    float gx = getGlobalX();
-    float gy = getGlobalY();
-
-    float model[16] = {
-        gw,   0.0f, 0.0f, 0.0f,
-        0.0f, gh,   0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        gx,   gy,   0.0f, 1.0f
-    };
-    glProgramUniformMatrix4fv(shader.getID(), LOC_MODEL, 1, GL_FALSE, model);
-
-    m_texture->bind();
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    // 透過 renderer 綁定紋理並完成繪製
+    renderer.drawTexturedRect(
+        getGlobalX(), getGlobalY(),
+        getLocalWidth(), getLocalHeight(),
+        m_texture->getID(),
+        m_color
+    );
 }
 
 bool UIText::handleMouseMove(double /*x*/, double /*y*/) {

@@ -1,4 +1,5 @@
 #include <UI/UIContainer.h>
+#include <Renderer/UIRenderer.h>
 #include <UI/UIWindow.h>
 #include <algorithm>
 #include <GLFW/glfw3.h>
@@ -41,41 +42,28 @@ void UIContainer::update(float dt) {
     }
 }
 
-void UIContainer::render(const Shader& shader) {
+void UIContainer::render(UIRenderer& renderer) {
     if (!isVisible()) return;
 
     bool clip = m_clipToBounds && (getWidth() > 0.0f && getHeight() > 0.0f);
     if (clip) {
-        glEnable(GL_SCISSOR_TEST);
-		// 注意 OpenGL 視窗座標原點在左下角，需用視窗高度換算 Y
-        int winW, winH;
-        glfwGetFramebufferSize(glfwGetCurrentContext(), &winW, &winH);
-
-        // 這裡調用 getGlobalX/Y 時，若無位移直接回傳快取值，零運算成本
-        float gx = getGlobalX();
-        float gy = getGlobalY();
-        float gw = getLocalWidth();
-        float gh = getLocalHeight();
-        
-        glScissor(static_cast<GLint>(gx),
-                  static_cast<GLint>(winH - (gy + gh)),
-                  static_cast<GLsizei>(gw),
-                  static_cast<GLsizei>(gh));
+        renderer.pushClipRect(getGlobalX(), getGlobalY(), getLocalWidth(), getLocalHeight());
     }
 
     for (auto& child : m_children) {
         if (child && child->isVisible()) {
-            child->render(shader);
+            child->render(renderer);
         }
     }
 
     if (clip) {
-        glDisable(GL_SCISSOR_TEST);
+        renderer.popClipRect();
     }
 
-    // 渲染完成後清除結構髒標記
     clearHierarchyDirty();
 }
+
+
 bool UIContainer::handleMouseMove(double x, double y) {
     if (!isVisible()) return false;
 

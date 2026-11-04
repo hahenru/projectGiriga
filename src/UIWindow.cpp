@@ -1,6 +1,9 @@
 #include <UI/UIWindow.h>
+#include <Renderer/UIRenderer.h>
 #include <GLFW/glfw3.h>
 #include <algorithm>
+
+class UIRenderer;
 
 UIWindow::UIWindow(float x, float y, float width, float height,
                    const FontLoader& font, const std::u32string& title,
@@ -78,50 +81,22 @@ bool UIWindow::isInsideTitleBar(double x, double y) const {
     y >= gy && y <= gy + m_titleBarHeight);
 }
 
-void UIWindow::render(const Shader& shader) {
+void UIWindow::render(UIRenderer& renderer) {
     if (!m_visible) return;
-
-    constexpr GLint LOC_MODEL    = 1;
-    constexpr GLint LOC_UI_COLOR = 2;
-    constexpr GLint LOC_IS_TEXT  = 3;
-
-    glProgramUniform1i(shader.getID(), LOC_IS_TEXT, 0);
 
     float gx = getGlobalX();
     float gy = getGlobalY();
 
-    // 1. 繪製視窗本體 (Body)
-    glProgramUniform4fv(shader.getID(), LOC_UI_COLOR, 1, m_bodyColor);
-    float bodyModel[16] = {
-        m_width, 0.0f,     0.0f, 0.0f,
-        0.0f,    m_height, 0.0f, 0.0f,
-        0.0f,    0.0f,     1.0f, 0.0f,
-        gx,      gy,       0.0f, 1.0f
-    };
-    glProgramUniformMatrix4fv(shader.getID(), LOC_MODEL, 1, GL_FALSE, bodyModel);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    // 1. 繪製本體
+    renderer.drawQuad(gx, gy, m_width, m_height, m_bodyColor);
 
-    // 2. 繪製標題列 (Title Bar)
-    glProgramUniform4fv(shader.getID(), LOC_UI_COLOR, 1, m_titleBarColor);
-    float titleModel[16] = {
-        m_width, 0.0f,             0.0f, 0.0f,
-        0.0f,    m_titleBarHeight, 0.0f, 0.0f,
-        0.0f,    0.0f,             1.0f, 0.0f,
-        gx,      gy,               0.0f, 1.0f
-    };
-    glProgramUniformMatrix4fv(shader.getID(), LOC_MODEL, 1, GL_FALSE, titleModel);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    // 2. 繪製標題列
+    renderer.drawQuad(gx, gy, m_width, m_titleBarHeight, m_titleBarColor);
 
-    // 3. 繪製標題文字與關閉按鈕
-    if (m_titleText) {
-        m_titleText->render(shader);
-    }
-    if (m_closeButton) {
-        m_closeButton->render(shader);
-    }
-
-    // 4. 繪製內部內容容器
-    m_container.render(shader);
+    // 3. 繪製內部物件
+    if (m_titleText)   m_titleText->render(renderer);
+    if (m_closeButton) m_closeButton->render(renderer);
+    m_container.render(renderer);
 }
 
 void UIWindow::clampPosition(float screenW, float screenH) {

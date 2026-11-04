@@ -8,20 +8,19 @@ namespace fs = std::filesystem;
 
 Girigara::Girigara(int width, int height, const std::string& title)
 : m_logger(65535),
-m_glfw(),
-m_eventBus(),
-m_keyboardSystem(m_eventBus),
-m_window(std::make_unique<WindowManager>(width, height, title, m_eventBus, m_logger)),
-m_resources(m_logger),
-m_scriptEngine(),
-m_console(m_logger) {
+  m_glfw(),
+  m_eventBus(),
+  m_keyboardSystem(m_eventBus),
+  m_window(std::make_unique<WindowManager>(width, height, title, m_eventBus, m_logger)),
+  m_resources(m_logger),
+  m_scriptEngine(),
+  m_console(m_logger) {
 
     m_logger.info("引擎初始化開始...");
 
     GlfwContext::initGLAD();
 
     initSubsystems();
-    setupUI();
     setupShortcuts();
 
     m_logger.info("引擎初始化完成。");
@@ -31,7 +30,7 @@ void Girigara::initSubsystems() {
     m_uiShader = &m_resources.loadShader("ui", "./assets/shaders/ui.vert", "./assets/shaders/ui.frag");
     m_window->setShader(m_uiShader);
 
-    int fbWidth, fbHeight;
+    int fbWidth = 800, fbHeight = 600;
     glfwGetFramebufferSize(m_window->getWindow(), &fbWidth, &fbHeight);
     glViewport(0, 0, fbWidth, fbHeight);
     m_window->updateProjection(fbWidth, fbHeight);
@@ -46,11 +45,24 @@ void Girigara::initSubsystems() {
     ScriptBindings::registerAll(m_scriptEngine.getRawState(), m_logger);
     m_console.setScriptEngine(&m_scriptEngine);
 
-    // 2. ★ 載入 ./assets/sysScripts/ 裡的所有 Lua 系統腳本
+    // 2. 載入 ./assets/sysScripts/ 裡的所有 Lua 系統腳本
     loadSystemScripts("./assets/sysScripts");
 
+    // 3. 建立場景管理器（純邏輯，徹底移除 UI 渲染）
     m_sceneManager = std::make_unique<SceneManager>(m_eventBus, m_resources, m_logger);
-    m_quadMesh = std::make_unique<QuadMesh>();
+
+    // 4. ★ 建立 UIManager：全面接管三棵樹生命週期與內部 UIRenderer 封裝
+    m_uiManager = std::make_unique<UIManager>(
+        *m_uiShader,
+        *m_defaultFont,
+        m_eventBus,
+        m_keyboardSystem,
+        m_console,
+        m_logger,
+        m_resources,
+        static_cast<float>(fbWidth),
+        static_cast<float>(fbHeight)
+    );
 }
 
 void Girigara::loadSystemScripts(const std::string& directoryPath) {
@@ -63,19 +75,15 @@ void Girigara::loadSystemScripts(const std::string& directoryPath) {
 
     m_logger.info("[Script] 開始載入系統腳本目錄: " + directoryPath);
 
-    // 遞迴掃描目錄下所有檔案
     for (const auto& entry : fs::recursive_directory_iterator(dir)) {
         if (entry.is_regular_file() && entry.path().extension() == ".lua") {
             std::string filePath = entry.path().string();
-            // 使用去除副檔名的檔名作為資源名稱，例如 "debug.lua" -> "debug"
             std::string scriptName = entry.path().stem().string();
 
             try {
-                // 由 ResourceManager 載入並快取[cite: 14]
                 m_resources.loadScript(scriptName, filePath);
                 const auto& scriptRes = m_resources.getScript(scriptName);
 
-                // 立即由 ScriptEngine 執行一次，將全域函式註冊進虛擬機
                 if (m_scriptEngine.executeResource(scriptRes)) {
                     m_logger.info("[Script] 已註冊系統腳本: " + scriptName + " (" + filePath + ")");
                 } else {
@@ -88,53 +96,14 @@ void Girigara::loadSystemScripts(const std::string& directoryPath) {
     }
 }
 
-void Girigara::setupUI() {
-    auto& globalUI = m_sceneManager->getGlobalUI();
-
-    int fbWidth, fbHeight;
-    glfwGetFramebufferSize(m_window->getWindow(), &fbWidth, &fbHeight);
-
-    // 1. 建立 In-Game Console
-    m_inGameConsole = globalUI.emplaceChild<UIConsole>(
-        0.0f, 0.0f,
-        static_cast<float>(fbWidth),
-                                                       static_cast<float>(fbHeight),
-                                                       *m_defaultFont,
-                                                       m_eventBus,
-                                                       m_console,
-                                                       m_logger,
-                                                       m_resources
-    );
-    m_inGameConsole->setName("InGameConsole");
-}
-
 void Girigara::setupShortcuts() {
-    auto& globalUI = m_sceneManager->getGlobalUI();
-
-    // ` (Grave Accent / Tilde): 切換 In-Game Console
+    // ` (波浪鍵)：直接呼叫 UIManager 的切換控制台介面
     m_keyboardSystem.registerShortcut(
         GLFW_KEY_GRAVE_ACCENT,
         0,
-        [this, &globalUI]() {
-            if (!m_inGameConsole) return;
-            bool nextVisible = !m_inGameConsole->isVisible();
-            m_inGameConsole->setVisible(nextVisible);
-            if (nextVisible) {
-                globalUI.setFocusedElement(m_inGameConsole);
-            }
-        }
-    );
-
-    // Ctrl + Shift + U: 超級全局快捷鍵 (在 Console 開啟時依然有效)
-    m_keyboardSystem.registerShortcut(
-        GLFW_KEY_U,
-        GLFW_MOD_CONTROL | GLFW_MOD_SHIFT,
-        [this, &globalUI]() {
-            if (!m_globalConsoleWindow) return;
-            bool nextVisible = !m_globalConsoleWindow->isVisible();
-            m_globalConsoleWindow->setVisible(nextVisible);
-            if (nextVisible) {
-                globalUI.setFocusedElement(m_globalConsoleWindow);
+        [this]() {
+            if (m_uiManager) {
+                m_uiManager->toggleConsole();
             }
         }
     );
@@ -150,14 +119,27 @@ void Girigara::run() {
         lastTime = currentTime;
 
         m_window->pollEvents();
-        m_sceneManager->update(dt);
 
+        // 1. 邏輯更新（場景更新 + UIManager 三棵樹 Tick 更新）
+        m_sceneManager->update(dt);
+        m_uiManager->update(dt);
+
+        // 2. 清空
         glClearColor(0.12f, 0.12f, 0.14f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        m_uiShader->use();
-        glBindVertexArray(m_quadMesh->getVAO());
-        m_sceneManager->render(*m_uiShader);
+        // 3. 解析度更新廣播（供視窗縮放時自適應）
+        int fbWidth = 0, fbHeight = 0;
+        glfwGetFramebufferSize(m_window->getWindow(), &fbWidth, &fbHeight);
+        m_uiManager->onWindowResize(static_cast<float>(fbWidth), static_cast<float>(fbHeight));
+
+        // 4. 場景純世界渲染（不碰 UI）
+        if (auto* scene = m_sceneManager->getCurrentScene()) {
+            scene->renderWorld();
+        }
+
+        // 5. ★ 全權由 UIManager 渲染三棵樹（內部封裝 UIRenderer 與剪裁堆疊）
+        m_uiManager->render();
 
         m_window->swapBuffers();
     }

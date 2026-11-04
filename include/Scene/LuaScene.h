@@ -7,7 +7,6 @@
 
 class LuaScene : public Scene {
 public:
-    // 前 4 個參數由 SceneManager 自動傳入，衍生類只需要管後面的參數
     LuaScene(SceneManager& manager,
              EventBus& bus,
              ResourceManager& resources,
@@ -15,19 +14,22 @@ public:
              ScriptEngine& scriptEngine,
              std::string scriptResourceName)
     : Scene(manager, bus, resources, logger),
-    m_scriptEngine(scriptEngine),
-    m_scriptResourceName(std::move(scriptResourceName)) {}
+      m_scriptEngine(scriptEngine),
+      m_scriptResourceName(std::move(scriptResourceName)) {}
 
     ~LuaScene() override = default;
 
     void onEnter() override;
     void onExit() override;
     void update(float dt) override;
-    void render(const Shader& shader) override;
+    void renderWorld() override {}
+
+    std::unique_ptr<UIContainer> createUI() override;
 
 private:
     ScriptEngine& m_scriptEngine;
     std::string m_scriptResourceName;
+    std::unique_ptr<UIContainer> m_luaUI;
 };
 
 #endif // GIRIGARA_SCENE_LUA_SCENE_H

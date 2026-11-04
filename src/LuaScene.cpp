@@ -1,8 +1,13 @@
 #include <Scene/LuaScene.h>
 
+std::unique_ptr<UIContainer> LuaScene::createUI() {
+    auto uiRoot = std::make_unique<UIContainer>();
+    // 若 Lua 腳本有註冊 UI 元件，後續可在這裡組裝
+    return uiRoot;
+}
+
 void LuaScene::onEnter() {
     try {
-        // 父類別 Scene 已經持有 m_resources
         const auto& script = m_resources.getScript(m_scriptResourceName);
         m_logger.log("[LuaScene] 載入腳本: " + script.getPath());
 
@@ -16,12 +21,10 @@ void LuaScene::onEnter() {
 
 void LuaScene::onExit() {
     m_scriptEngine.callFunction("OnSceneExit");
-    m_uiRoot.clear();
+    // UI 清理已由 UIManager 託管，不再手動清空 m_uiRoot
 }
 
 void LuaScene::update(float dt) {
-    Scene::update(dt);
-
     lua_State* L = m_scriptEngine.getRawState();
     if (L) {
         lua_getglobal(L, "OnSceneUpdate");
@@ -36,8 +39,4 @@ void LuaScene::update(float dt) {
             lua_pop(L, 1);
         }
     }
-}
-
-void LuaScene::render(const Shader& shader) {
-    Scene::render(shader); // 繪製局部 UI[cite: 31]
 }

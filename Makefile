@@ -81,7 +81,8 @@ SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
       src/UIWindow.cpp src/KeyboardSystem.cpp src/SceneManager.cpp \
       src/MainMenuScene.cpp src/GameScene.cpp src/ScriptEngine.cpp \
       src/ScriptBindings.cpp src/ScriptResource.cpp src/ConsoleSystem.cpp \
-      src/FontLoader.cpp src/UIVerticalLayout.cpp src/UISlantedLayout.cpp
+      src/FontLoader.cpp src/UIVerticalLayout.cpp src/UISlantedLayout.cpp \
+	  src/UIRenderer.cpp src/UIManager.cpp
 
 # Linux / 交叉編譯目標檔路徑
 OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \

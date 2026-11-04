@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 
+class UIRenderer; // 前置宣告
+
 class UIText : public UIElement {
 public:
     // fontSize 預設為 0 代表直接沿用 FontLoader 的原生烘焙大小
@@ -24,7 +26,7 @@ public:
     void setColor(float r, float g, float b, float a = 1.0f);
 
     // 實作 UIElement 介面
-    void render(const Shader& shader) override;
+    void render(UIRenderer& renderer) override;
     bool handleMouseMove(double x, double y) override;
     bool handleMouseButton(int button, int action, int mods, double x, double y) override;
 

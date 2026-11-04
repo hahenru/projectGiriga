@@ -19,6 +19,7 @@
 #include <UI/UIConsole.h>
 #include <UI/UIWindow.h>
 #include <Scene/LuaScene.h>
+#include <UI/UIManager.h>
 
 class Girigara {
 public:
@@ -71,6 +72,7 @@ private:
 
     UIConsole* m_inGameConsole{nullptr};
     UIWindow* m_globalConsoleWindow{nullptr};
+	std::unique_ptr<UIManager> m_uiManager{nullptr};
 
     bool m_isRunning{false};
 };

@@ -5,6 +5,8 @@
 #include <vector>
 #include <memory>
 
+class UIRenderer;
+
 class UIContainer : public UIElement {
 public:
     UIContainer() = default;
@@ -33,7 +35,7 @@ public:
 
     // 核心補齊：遞迴更新子節點
     void update(float dt) override;
-    void render(const Shader& shader) override;
+    void render(UIRenderer& renderer) override;
     bool handleMouseMove(double x, double y) override;
     bool handleMouseButton(int button, int action, int mods, double x, double y) override;
     bool handleKey(int key, int scancode, int action, int mods) override;
