@@ -78,16 +78,6 @@ public:
     bool focused;
 };
 
-// 滑鼠滾輪事件
-class MouseScrolledEvent : public Event {
-public:
-    MouseScrolledEvent(double xoffset, double yoffset)
-    : xoffset(xoffset), yoffset(yoffset) {}
-
-    double xoffset;
-    double yoffset;
-};
-
 // 視窗緩衝區/大小改變事件
 class WindowResizeEvent : public Event {
 public:
@@ -105,6 +95,16 @@ public:
         : uiTree(std::move(newUI)) {}
 
     std::unique_ptr<UIContainer> uiTree;
+};
+
+class MouseScrolledEvent : public Event {
+public:
+    MouseScrolledEvent(double xoffset, double yoffset, int mods = 0)
+    : xoffset(xoffset), yoffset(yoffset), mods(mods) {}
+
+    double xoffset;
+    double yoffset;
+    int mods; // ★ 攜帶修飾鍵 (GLFW_MOD_CONTROL, GLFW_MOD_SHIFT 等)
 };
 
 #endif // GIRIGARA_EVENT_EVENT_H

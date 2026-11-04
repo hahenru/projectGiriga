@@ -125,7 +125,23 @@ void WindowManager::onFramebufferSize(int width, int height) {
 }
 
 void WindowManager::onScroll(double xoffset, double yoffset) {
-    m_eventBus.publish(MouseScrolledEvent(xoffset, yoffset));
+    // 檢查 GLFW 視窗當前是否按著 Ctrl / Shift / Alt
+    int mods = 0;
+    if (glfwGetKey(m_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+        glfwGetKey(m_window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) {
+        mods |= GLFW_MOD_CONTROL;
+    }
+    if (glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+        glfwGetKey(m_window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) {
+        mods |= GLFW_MOD_SHIFT;
+    }
+    if (glfwGetKey(m_window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
+        glfwGetKey(m_window, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
+        mods |= GLFW_MOD_ALT;
+    }
+
+	MouseScrolledEvent event{xoffset, yoffset, mods};
+    m_eventBus.publish(event);
 }
 
 // -------------------------------------------------------------
@@ -164,5 +180,7 @@ void WindowManager::staticFramebufferSizeCallback(GLFWwindow* window, int width,
 
 void WindowManager::staticScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     auto* self = static_cast<WindowManager*>(glfwGetWindowUserPointer(window));
-    if (self) self->onScroll(xoffset, yoffset);
+    if (self) {
+        self->onScroll(xoffset, yoffset);
+    }
 }

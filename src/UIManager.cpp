@@ -16,18 +16,18 @@ UIManager::UIManager(Shader& uiShader,
       m_screenWidth(screenWidth),
       m_screenHeight(screenHeight) {
 
-    // 1. 全域根畫布必須永遠保持「穿透」模式[cite: 23]
+    // 1. 全域根畫布保持穿透模式
     m_rootUI.setPosition(0.0f, 0.0f);
     m_rootUI.setSize(screenWidth, screenHeight);
     m_rootUI.setPassThrough(true);
 
-    // 2. 掛載 Console
+    // 2. ★ 掛載 Console：尺寸設為 100% 全螢幕 (寬度 screenWidth, 高度 screenHeight)
     m_console = m_rootUI.emplaceChild<UIConsole>(
-        0.0f, 0.0f, screenWidth, screenHeight * 0.45f,
+        0.0f, 0.0f, screenWidth, screenHeight,
         m_font, m_eventBus, console, logger, m_resources
     );
     m_console->setName("InGameConsole");
-    m_console->setVisible(false); // 預設隱藏[cite: 28]
+    m_console->setVisible(false);
 
     // 3. 綁定熱鍵
     keyboard.registerShortcut(
@@ -37,6 +37,21 @@ UIManager::UIManager(Shader& uiShader,
 
     // 4. 監聽所有事件
     bindEvents();
+}
+
+void UIManager::onWindowResize(float width, float height) {
+    m_screenWidth = width;
+    m_screenHeight = height;
+    m_renderer.setScreenSize(width, height);
+    m_rootUI.setSize(width, height);
+
+    // ★ 關鍵：視窗縮放時，Console 同步更新為 100% 全螢幕高
+    if (m_console) {
+        m_console->setSize(width, height);
+    }
+    if (m_activeSceneUI) {
+        m_activeSceneUI->setSize(width, height);
+    }
 }
 
 void UIManager::bindEvents() {
@@ -50,7 +65,7 @@ void UIManager::bindEvents() {
         if (m_activeSceneUI) {
             m_activeSceneUI->setPosition(0.0f, 0.0f);
             m_activeSceneUI->setSize(m_screenWidth, m_screenHeight);
-            m_activeSceneUI->setPassThrough(true); // 場景根容器也是穿透的[cite: 23]
+            m_activeSceneUI->setPassThrough(true); // 場景根容器也是穿透的
         }
     });
 
@@ -64,17 +79,17 @@ void UIManager::bindEvents() {
         // 先由頂層全域 UI 處理 (若 Console 打開且滑鼠在其上，會攔截)
         bool handled = m_rootUI.handleMouseMove(e.x, e.y);
         
-        // 若全域 UI 沒攔截 (例如 Console 隱藏或滑鼠在 Console 外)，再交給場景 UI[cite: 27]
+        // 若全域 UI 沒攔截 (例如 Console 隱藏或滑鼠在 Console 外)，再交給場景 UI
         if (!handled && m_activeSceneUI && m_activeSceneUI->isVisible()) {
             m_activeSceneUI->handleMouseMove(e.x, e.y);
         }
     });
 
-    // D. ★ 關鍵修正：滑鼠點擊事件派發 (用於按鈕 Click 與輸入框 Focus)[cite: 20, 26, 27]
+    // D. ★ 關鍵修正：滑鼠點擊事件派發 (用於按鈕 Click 與輸入框 Focus)
     m_eventBus.subscribePriority<MouseButtonEvent>([this](MouseButtonEvent& e) {
         // 1. 優先送給頂層全域樹 (Console)
         if (m_rootUI.handleMouseButton(e.button, e.action, e.mods, e.x, e.y)) {
-            e.isHandled = true; // 被 Console 攔截，底層按鈕絕不觸發[cite: 27, 28]
+            e.isHandled = true; // 被 Console 攔截，底層按鈕絕不觸發
             return;
         }
 
@@ -106,19 +121,6 @@ void UIManager::toggleConsole() {
     }
 }
 
-void UIManager::onWindowResize(float width, float height) {
-    m_screenWidth = width;
-    m_screenHeight = height;
-    m_renderer.setScreenSize(width, height);
-    m_rootUI.setSize(width, height);
-
-    if (m_console) {
-        m_console->setSize(width, height * 0.45f);
-    }
-    if (m_activeSceneUI) {
-        m_activeSceneUI->setSize(width, height);
-    }
-}
 
 void UIManager::update(float dt) {
     m_rootUI.update(dt);

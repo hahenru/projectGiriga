@@ -242,7 +242,7 @@ flatpak: | $(BUILD_DIR)
 # ==========================================
 clean:
 ifeq ($(HOST_OS),Windows)
-	@echo ==> 清理建置輸出目錄 (Windows)...
+	@echo 清理建置輸出目錄 (Windows)...
 	@if exist $(BUILD_DIR) rmdir /S /Q $(BUILD_DIR)
 else
 	@echo "==> 清理建置輸出目錄 (Linux)..."
