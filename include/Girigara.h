@@ -20,6 +20,7 @@
 #include <UI/UIWindow.h>
 #include <Scene/LuaScene.h>
 #include <UI/UIManager.h>
+#include <Audio/AudioSystem.h>
 
 class Girigara {
 public:
@@ -62,6 +63,7 @@ private:
     KeyboardSystem m_keyboardSystem;
     std::unique_ptr<WindowManager> m_window;
     ResourceManager m_resources;
+	AudioSystem m_audio;
     ScriptEngine m_scriptEngine;
     ConsoleSystem m_console;
     std::unique_ptr<SceneManager> m_sceneManager;

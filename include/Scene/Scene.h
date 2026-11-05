@@ -7,12 +7,15 @@
 #include <UI/UIContainer.h>
 #include <memory>
 
+class AudioSystem;
 class SceneManager;
 
 class Scene {
 public:
-    Scene(SceneManager& manager, EventBus& bus, ResourceManager& resources, LoggerSystem& logger)
-        : m_manager(manager), m_bus(bus), m_resources(resources), m_logger(logger) {}
+	Scene(SceneManager& manager, EventBus& bus, ResourceManager& resources,
+          LoggerSystem& logger, AudioSystem& audio)
+        : m_manager(manager), m_bus(bus), m_resources(resources),
+          m_logger(logger), m_audio(audio) {}
 
     virtual ~Scene() = default;
 
@@ -37,6 +40,7 @@ protected:
     EventBus& m_bus;
     ResourceManager& m_resources;
     LoggerSystem& m_logger;
+	AudioSystem& m_audio;
 };
 
 #endif // GIRIGARA_SCENE_SCENE_H

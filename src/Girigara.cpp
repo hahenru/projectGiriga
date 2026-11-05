@@ -36,14 +36,14 @@ void Girigara::initSubsystems() {
     m_window->updateProjection(fbWidth, fbHeight);
 
     // 1. 註冊 Lua C++ 綁定與連接 Console
-    ScriptBindings::registerAll(m_scriptEngine.getRawState(), m_logger);
+    ScriptBindings::registerAll(m_scriptEngine.getRawState(), m_logger, m_audio);
     m_console.setScriptEngine(&m_scriptEngine);
 
     // 2. 載入系統腳本
     loadSystemScripts("./assets/sysScripts");
 
     // 3. 建立場景管理器
-    m_sceneManager = std::make_unique<SceneManager>(m_eventBus, m_resources, m_logger);
+    m_sceneManager = std::make_unique<SceneManager>(m_eventBus, m_resources, m_logger, m_audio);
 
     // 4. 建立 UIManager：把 FontLoader 拔除，UIManager 內部直接透過 m_resources 管理字體
     m_uiManager = std::make_unique<UIManager>(

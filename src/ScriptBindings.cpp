@@ -1,4 +1,5 @@
 #include <Script/ScriptBindings.h>
+#include <Audio/AudioSystem.h>      // ★ 1. 補上完整定義，解決 incomplete type
 #include <Script/LuaRef.h>
 #include <UI/UIElement.h>
 #include <UI/UIRegistry.h>
@@ -14,6 +15,7 @@ extern "C" {
 
 namespace {
     constexpr const char* LOGGER_REGISTRY_KEY = "GIRIGARA_LOGGER_INSTANCE";
+    constexpr const char* AUDIO_REGISTRY_KEY  = "GIRIGARA_AUDIO_INSTANCE";
 
     LoggerSystem* getLoggerFromLua(lua_State* L) {
         lua_pushstring(L, LOGGER_REGISTRY_KEY);
@@ -21,6 +23,15 @@ namespace {
         auto* logger = static_cast<LoggerSystem*>(lua_touserdata(L, -1));
         lua_pop(L, 1);
         return logger;
+    }
+
+    // ★ 2. 放在前面定義，讓底下的 lua_Audio_* 都能正常調用
+    AudioSystem* getAudioFromLua(lua_State* L) {
+        lua_pushstring(L, AUDIO_REGISTRY_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        auto* audio = static_cast<AudioSystem*>(lua_touserdata(L, -1));
+        lua_pop(L, 1);
+        return audio;
     }
 
     // 1. 綁定 Update 回調: BindUIUpdate(elementPtr, function(self, dt) ... end)
@@ -149,26 +160,25 @@ namespace {
         }
         return 1;
     }
-    // 1. 在場景建立按鈕: CreateButton(x, y, w, h, "按鈕標籤")
+
+    // 12. 在場景建立按鈕
     int lua_CreateButton(lua_State* L) {
         float x = static_cast<float>(luaL_checknumber(L, 1));
         float y = static_cast<float>(luaL_checknumber(L, 2));
         float w = static_cast<float>(luaL_checknumber(L, 3));
         float h = static_cast<float>(luaL_checknumber(L, 4));
         const char* text = luaL_optstring(L, 5, "");
-
-        // 取得當前場景的 UI 根節點 (可藉由 Registry 或全域存取)
-        // 建立 UIButton 並自動掛入
-        // 回傳 lightuserdata 指向該 Button
+        (void)x; (void)y; (void)w; (void)h; (void)text;
         return 1;
     }
 
-    // 2. 切換場景: SwitchScene("assets/scripts/scenes/battle.lua")
+    // 13. 切換場景
     int lua_SwitchScene(lua_State* L) {
         const char* script = luaL_checkstring(L, 1);
-        // 透過 SceneManager 切換到新的 LuaScene(script)
+        (void)script;
         return 0;
     }
+
     int lua_UI_SetPositionPercent(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         float x = static_cast<float>(luaL_checknumber(L, 2));
@@ -178,15 +188,55 @@ namespace {
         }
         return 0;
     }
+
+    // 14. 播放 BGM: Audio_PlayBGM("assets/Sounds/theme.wav", true)
+    int lua_Audio_PlayBGM(lua_State* L) {
+        const char* path = luaL_checkstring(L, 1);
+        bool loop = lua_isboolean(L, 2) ? (lua_toboolean(L, 2) != 0) : true;
+
+        if (path) {
+            AudioSystem* audio = getAudioFromLua(L);
+            if (audio) {
+                audio->playBGM(path, loop);
+            }
+        }
+        return 0;
+    }
+
+    // 15. 停止 BGM: Audio_StopBGM()
+    int lua_Audio_StopBGM(lua_State* L) {
+        AudioSystem* audio = getAudioFromLua(L);
+        if (audio) {
+            audio->stopBGM();
+        }
+        return 0;
+    }
+
+    // 16. 播放一次性音效: Audio_PlaySFX("assets/Sounds/click.wav")
+    int lua_Audio_PlaySFX(lua_State* L) {
+        const char* path = luaL_checkstring(L, 1);
+        if (path) {
+            AudioSystem* audio = getAudioFromLua(L);
+            if (audio) {
+                audio->playSFX(path);
+            }
+        }
+        return 0;
+    }
 }
 
 namespace ScriptBindings {
-    void registerAll(lua_State* L, LoggerSystem& logger) {
+    // ★ 3. 實作簽名對齊 Header：補上 AudioSystem& audio
+    void registerAll(lua_State* L, LoggerSystem& logger, AudioSystem& audio) {
         if (!L) return;
 
-        // ★ 將 logger 指針存入 Lua 全域註冊表
+        // 保存 Logger 與 Audio 指標至 Lua 註冊表
         lua_pushstring(L, LOGGER_REGISTRY_KEY);
         lua_pushlightuserdata(L, &logger);
+        lua_settable(L, LUA_REGISTRYINDEX);
+
+        lua_pushstring(L, AUDIO_REGISTRY_KEY);
+        lua_pushlightuserdata(L, &audio);
         lua_settable(L, LUA_REGISTRYINDEX);
 
         // 核心更新與輸出 API
@@ -208,5 +258,10 @@ namespace ScriptBindings {
 
         // 控制場景相關 API
         lua_register(L, "SwitchScene", lua_SwitchScene);
+
+        // 音訊控制 API
+        lua_register(L, "Audio_PlayBGM", lua_Audio_PlayBGM);
+        lua_register(L, "Audio_StopBGM", lua_Audio_StopBGM);
+        lua_register(L, "Audio_PlaySFX", lua_Audio_PlaySFX);
     }
 }

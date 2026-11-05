@@ -4,6 +4,7 @@
 #include <UI/UIButton.h>
 #include <UI/UIText.h>
 #include <UI/UISlantedLayout.h>
+#include <Audio/AudioSystem.h>
 #include <iostream>
 
 std::unique_ptr<UIContainer> MainMenuScene::createUI() {
@@ -53,6 +54,7 @@ std::unique_ptr<UIContainer> MainMenuScene::createUI() {
 }
 
 void MainMenuScene::onEnter() {
+	m_audio.playBGM("./assets/Sounds/Deserted-Hell.wav", true);
     std::cout << "[Scene] Entering MainMenuScene...\n";
 }
 

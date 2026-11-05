@@ -5,6 +5,7 @@
 #include <UI/UIWindow.h>
 #include <memory>
 
+
 class GameScene : public Scene {
 public:
     using Scene::Scene;

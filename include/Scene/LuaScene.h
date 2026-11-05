@@ -5,15 +5,18 @@
 #include <Script/ScriptEngine.h>
 #include <string>
 
+class AudioSystem;
+
 class LuaScene : public Scene {
 public:
-    LuaScene(SceneManager& manager,
+	LuaScene(SceneManager& manager,
              EventBus& bus,
              ResourceManager& resources,
              LoggerSystem& logger,
+             AudioSystem& audio, // ★ 補上
              ScriptEngine& scriptEngine,
              std::string scriptResourceName)
-    : Scene(manager, bus, resources, logger),
+    : Scene(manager, bus, resources, logger, audio), // ★ 傳給基底
       m_scriptEngine(scriptEngine),
       m_scriptResourceName(std::move(scriptResourceName)) {}
 

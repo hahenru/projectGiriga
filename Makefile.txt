@@ -49,7 +49,7 @@ WIN_CFLAGS   = -O2 -I./include
 
 # 全靜態鏈結：libglfw3.a、liblua.a、libgcc、libstdc++
 WIN_LDFLAGS  = -L$(WIN_LIB_DIR)/lib -L$(WIN_LUA_BUILD_DIR) -L$(WIN_PREFIX)/lib \
-               -lglfw3 -llua -lopengl32 \
+               -lglfw3 -llua -lopengl32 -lole32 \
                -lfreetype -lpng -lz -lbz2 \
                -lgdi32 -limm32 -lwinmm -lpthread \
                -static-libgcc -static-libstdc++ -static
@@ -66,7 +66,7 @@ WIN_NAT_CC  = gcc
 WIN_NAT_CXXFLAGS = -g -std=c++23 -I./include
 WIN_NAT_CFLAGS   = -g -I./include
 WIN_NAT_LDFLAGS  = -mwindows -Wl,--subsystem,windows \
-    -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread
+    -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread -lole32
 
 WIN_NAT_BUILD_DIR = $(BUILD_DIR)/win64_native
 WIN_NAT_TARGET    = $(WIN_NAT_BUILD_DIR)/projectGIRIGARA.exe
@@ -83,7 +83,7 @@ SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
       src/ScriptBindings.cpp src/ScriptResource.cpp src/ConsoleSystem.cpp \
       src/FontLoader.cpp src/UIVerticalLayout.cpp src/UISlantedLayout.cpp \
       src/UIRenderer.cpp src/UIManager.cpp src/FontResource.cpp \
-	  src/AudioResource.cpp miniaudio_impl.cpp
+	  src/AudioResource.cpp src/miniaudio_impl.cpp src/AudioSystem.cpp
 
 # Linux / 交叉編譯目標檔路徑
 OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \

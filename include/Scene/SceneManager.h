@@ -10,9 +10,11 @@
 #include <functional>
 #include <utility>
 
+class AudioSystem;
+
 class SceneManager {
 public:
-    SceneManager(EventBus& bus, ResourceManager& resources, LoggerSystem& logger);
+    SceneManager(EventBus& bus, ResourceManager& resources, LoggerSystem& logger, AudioSystem& audio);
     ~SceneManager();
 
     SceneManager(const SceneManager&) = delete;
@@ -27,7 +29,7 @@ public:
             if (m_currentScene) {
                 m_currentScene->onExit();
             }
-            m_currentScene = std::make_unique<T>(*this, m_bus, m_resources, m_logger, std::move(capturedArgs)...);
+            m_currentScene = std::make_unique<T>(*this, m_bus, m_resources, m_logger, m_audio, std::move(capturedArgs)...);
 
             // 提取新場景的 UI 樹並透過事件通知 UIManager 接管
             auto sceneUI = m_currentScene->createUI();
@@ -47,6 +49,7 @@ private:
     EventBus& m_bus;
     ResourceManager& m_resources;
     LoggerSystem& m_logger;
+	AudioSystem& m_audio;
 
     std::unique_ptr<Scene> m_currentScene{nullptr};
     std::function<void()> m_pendingSceneFactory{nullptr};

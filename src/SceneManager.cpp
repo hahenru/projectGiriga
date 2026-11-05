@@ -1,7 +1,8 @@
 #include <Scene/SceneManager.h>
+#include <Audio/AudioSystem.h>
 
-SceneManager::SceneManager(EventBus& bus, ResourceManager& resources, LoggerSystem& logger)
-    : m_bus(bus), m_resources(resources), m_logger(logger) {
+SceneManager::SceneManager(EventBus& bus, ResourceManager& resources, LoggerSystem& logger, AudioSystem& audio)
+    : m_bus(bus), m_resources(resources), m_logger(logger), m_audio(audio) {
 }
 
 SceneManager::~SceneManager() {
