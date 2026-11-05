@@ -1,5 +1,6 @@
 #include <UI/UIButton.h>
 #include <Renderer/UIRenderer.h>
+#include <Resource/ResourceManager.h>
 #include <GLFW/glfw3.h>
 
 UIButton::UIButton(float x, float y, float width, float height)
@@ -8,11 +9,12 @@ UIButton::UIButton(float x, float y, float width, float height)
     setPassThrough(false);
 }
 
-UIText* UIButton::setLabel(const FontLoader& font, const std::u32string& text,
-                           float r, float g, float b, float a) {
+UIText* UIButton::setLabel(ResourceManager& resources, const std::u32string& text,
+                           float r, float g, float b, float a,
+                           std::string fontName) {
     if (!m_label) {
-        // ★ 透過 UIContainer 的 emplaceChild 掛載，建立正確的父子關係
-        m_label = emplaceChild<UIText>(0.0f, 0.0f, font, text);
+        // ★ 透過 UIContainer 的 emplaceChild 掛載，傳入 resources
+        m_label = emplaceChild<UIText>(0.0f, 0.0f, resources, text, 0, std::move(fontName));
     } else {
         m_label->setText(text);
     }

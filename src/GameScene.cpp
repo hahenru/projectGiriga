@@ -7,24 +7,23 @@
 
 std::unique_ptr<UIContainer> GameScene::createUI() {
     auto uiRoot = std::make_unique<UIContainer>();
-    FontLoader& font = m_resources.getFont("default");
 
     // 放置一個在父容器水平 50.0%、垂直 80.0% 的按鈕
     auto* btn = uiRoot->emplaceChild<UIButton>(0.0f, 0.0f, 200.0f, 50.0f);
     btn->setPositionPercent(50.0f, 80.0f);
 
-    // 精確到 0.01%
-    auto* text = uiRoot->emplaceChild<UIText>(0.0f, 0.0f, font, U"精確座標");
+    // 精確座標文字：改傳 m_resources
+    auto* text = uiRoot->emplaceChild<UIText>(0.0f, 0.0f, m_resources, U"精確座標");
     text->setPositionPercent(12.34f, 56.78f);
 
-    // 遊戲場景專屬的對話視窗
+    // 遊戲場景專屬的對話視窗：改傳 m_resources
     m_consoleWindow = uiRoot->emplaceChild<UIWindow>(
         180.0f, 100.0f, 440.0f, 260.0f,
-        font, U"遊戲中控制台"
+        m_resources, U"遊戲中控制台"
     );
     m_consoleWindow->setCloseOnEsc(true);
 
-    auto* statusText = m_consoleWindow->emplaceContent<UIText>(20.0f, 50.0f, font, U"戰鬥模擬中...");
+    auto* statusText = m_consoleWindow->emplaceContent<UIText>(20.0f, 50.0f, m_resources, U"戰鬥模擬中...");
     statusText->setColor(0.3f, 0.9f, 0.4f, 1.0f);
 
     // 回到主選單按鈕
@@ -38,7 +37,7 @@ std::unique_ptr<UIContainer> GameScene::createUI() {
         m_manager.switchScene<MainMenuScene>();
     });
 
-    auto* backLabel = uiRoot->emplaceChild<UIText>(0.0f, 0.0f, font, U"回主選單");
+    auto* backLabel = uiRoot->emplaceChild<UIText>(0.0f, 0.0f, m_resources, U"回主選單");
     backLabel->setPosition(btnBack->getX() + 20.0f, btnBack->getY() + 10.0f);
 
     return uiRoot;

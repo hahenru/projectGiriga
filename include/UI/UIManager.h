@@ -21,14 +21,14 @@ struct DyingUIEntry {
 
 class UIManager {
 public:
-    UIManager(Shader& uiShader,
-              FontLoader& defaultFont,
-              EventBus& eventBus,
-              KeyboardSystem& keyboard,
-              ConsoleSystem& console,
-              LoggerSystem& logger,
-              ResourceManager& resources,
-              float screenWidth, float screenHeight);
+	UIManager(Shader& uiShader,
+		EventBus& eventBus,
+		KeyboardSystem& keyboard,
+		ConsoleSystem& console,
+		LoggerSystem& logger,
+		ResourceManager& resources,
+		float screenWidth, float screenHeight);
+
     ~UIManager() = default;
 
     UIManager(const UIManager&) = delete;
@@ -46,7 +46,6 @@ private:
     void bindEvents();
 
     UIRenderer m_renderer;
-    FontLoader& m_font;
     EventBus& m_eventBus;
     ResourceManager& m_resources;
 

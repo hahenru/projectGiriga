@@ -5,19 +5,21 @@
 #include <UI/UIContainer.h>
 #include <UI/UIText.h>
 #include <UI/UIButton.h>
+#include <Resource/ResourceManager.h>
+
 #include <memory>
 #include <string>
 
 class UIWindow : public UIElement {
 public:
     // 方式 1：字串構造，支援指定標題字號 (預設 0 使用原字型大小)
-    UIWindow(float x, float y, float width, float height,
-             const FontLoader& font, const std::u32string& title,
-             unsigned int titleFontSize = 0);
+	UIWindow(float x, float y, float width, float height,
+		ResourceManager& resources, const std::u32string& title,
+		unsigned int titleFontSize = 0, std::string fontName = "default");
 
     // 方式 2：直接傳入外部構造好的 UIText (支援移動語意)
     UIWindow(float x, float y, float width, float height,
-             std::unique_ptr<UIText> titleText);
+		std::unique_ptr<UIText> titleText);
 
     ~UIWindow() override = default;
 

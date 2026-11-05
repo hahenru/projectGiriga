@@ -1,9 +1,15 @@
 #include <UI/UIText.h>
 #include <Renderer/UIRenderer.h>
+#include <algorithm>
 
-
-UIText::UIText(float x, float y, const FontLoader& font, const std::u32string& text, unsigned int fontSize)
-: UIElement(x, y, 0.0f, 0.0f), m_font(font), m_text(text), m_targetFontSize(fontSize) {
+UIText::UIText(float x, float y, ResourceManager& resources,
+               const std::u32string& text, unsigned int fontSize,
+               std::string fontName)
+    : UIElement(x, y, 0.0f, 0.0f),
+      m_resources(resources),
+      m_fontName(std::move(fontName)),
+      m_text(text),
+      m_targetFontSize(fontSize) {
     rebake();
 }
 
@@ -18,6 +24,13 @@ void UIText::setFontSize(unsigned int fontSize) {
     if (m_targetFontSize != fontSize) {
         m_targetFontSize = fontSize;
         updateMetrics();
+    }
+}
+
+void UIText::setFontName(const std::string& fontName) {
+    if (m_fontName != fontName) {
+        m_fontName = fontName;
+        rebake();
     }
 }
 
@@ -36,8 +49,8 @@ void UIText::updateMetrics() {
         return;
     }
 
-    // 1. 取得 FontLoader 的原生烘焙基準字號
-    unsigned int baseSize = m_font.getFontSize();
+    FontLoader& font = m_resources.getFontLoader(m_fontName);
+    unsigned int baseSize = font.getFontSize();
     if (m_targetFontSize > 0 && baseSize > 0) {
         m_scale = static_cast<float>(m_targetFontSize) / static_cast<float>(baseSize);
     } else {
@@ -47,7 +60,6 @@ void UIText::updateMetrics() {
     float baseW = static_cast<float>(m_texture->getWidth()) * m_scale;
     float baseH = static_cast<float>(m_texture->getHeight()) * m_scale;
 
-    // 2. ★ 尺寸限制：如果設有父節點且字體超出父節點可用空間，強制縮小
     if (m_parent && m_parent->getWidth() > 0.0f && m_parent->getHeight() > 0.0f) {
         float maxAvailableW = m_parent->getWidth();
         float maxAvailableH = m_parent->getHeight();
@@ -77,15 +89,15 @@ void UIText::rebake() {
         return;
     }
 
-    // 重新烘焙成單通道紋理
-    m_texture = std::make_unique<TextTexture>(m_font, m_text);
+    // ★ 直接跟 ResourceManager 要字型烘焙
+    FontLoader& font = m_resources.getFontLoader(m_fontName);
+    m_texture = std::make_unique<TextTexture>(font, m_text);
     updateMetrics();
 }
 
 void UIText::render(UIRenderer& renderer) {
     if (!m_visible || !m_texture || m_width <= 0.0f || m_height <= 0.0f) return;
 
-    // 透過 renderer 綁定紋理並完成繪製
     renderer.drawTexturedRect(
         getGlobalX(), getGlobalY(),
         getLocalWidth(), getLocalHeight(),
@@ -94,10 +106,5 @@ void UIText::render(UIRenderer& renderer) {
     );
 }
 
-bool UIText::handleMouseMove(double /*x*/, double /*y*/) {
-    return false; // 不攔截滑鼠懸停，讓事件穿透到下方的按鈕
-}
-
-bool UIText::handleMouseButton(int /*button*/, int /*action*/, int /*mods*/, double /*x*/, double /*y*/) {
-    return false; // 不攔截滑鼠點擊，讓下方的 UIButton 接收事件
-}
+bool UIText::handleMouseMove(double, double) { return false; }
+bool UIText::handleMouseButton(int, int, int, double, double) { return false; }

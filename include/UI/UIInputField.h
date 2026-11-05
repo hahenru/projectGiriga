@@ -3,9 +3,9 @@
 
 #include <UI/UIContainer.h>
 #include <UI/UIText.h>
-#include <Font/FontLoader.h>
 #include <Event/EventBus.h>
 #include <Renderer/UIRenderer.h>
+#include <Resource/ResourceManager.h>
 #include <GLFW/glfw3.h>
 #include <string>
 #include <functional>
@@ -74,18 +74,20 @@ class UIInputField : public UIContainer {
 public:
     using SubmitCallback = std::function<void(const std::string&)>;
 
-    UIInputField(float x, float y, float width, float height,
-                 FontLoader& font, EventBus& eventBus, unsigned int fontSize = 18)
-        : UIContainer(x, y, width, height),
-          m_font(font),
-          m_eventBus(eventBus),
-          m_fontSize(fontSize) {
-        
-        // 內嵌 UIText 節點，初始傳入空字串 U"" 與字級
-        m_textLabel = emplaceChild<UIText>(
-            6.0f, (height - static_cast<float>(fontSize)) * 0.5f,
-            m_font, U"", fontSize
-        );
+	UIInputField(float x, float y, float width, float height,
+				 ResourceManager& resources, EventBus& eventBus, unsigned int fontSize = 18,
+				 std::string fontName = "default")
+		: UIContainer(x, y, width, height),
+		  m_resources(resources),
+		  m_eventBus(eventBus),
+		  m_fontSize(fontSize),
+		  m_fontName(std::move(fontName)) {
+		
+		m_textLabel = emplaceChild<UIText>(
+			6.0f, (height - static_cast<float>(fontSize)) * 0.5f,
+			m_resources, U"", fontSize, m_fontName
+		);
+		
         m_textLabel->setColor(1.0f, 1.0f, 1.0f, 1.0f);
 
         bindEvents();
@@ -191,7 +193,8 @@ private:
         });
     }
 
-    FontLoader& m_font;
+    ResourceManager& m_resources;
+	std::string m_fontName;
     EventBus& m_eventBus;
     UIText* m_textLabel{nullptr};
     SubmitCallback m_onSubmit;

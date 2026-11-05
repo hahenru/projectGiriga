@@ -45,7 +45,7 @@ public:
         // SceneManager 會自動補齊前 4 個參數，這裡只需傳入 ScriptEngine 和 資源名稱
         m_sceneManager->switchScene<LuaScene>(
             std::ref(m_scriptEngine),
-                                              scriptResourceName
+            scriptResourceName
         );
     }
 
@@ -67,7 +67,6 @@ private:
     std::unique_ptr<SceneManager> m_sceneManager;
 
     Shader* m_uiShader{nullptr};
-    FontLoader* m_defaultFont{nullptr};
     std::unique_ptr<QuadMesh> m_quadMesh;
 
     UIConsole* m_inGameConsole{nullptr};

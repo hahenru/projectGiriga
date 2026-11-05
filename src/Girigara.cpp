@@ -35,26 +35,19 @@ void Girigara::initSubsystems() {
     glViewport(0, 0, fbWidth, fbHeight);
     m_window->updateProjection(fbWidth, fbHeight);
 
-    m_defaultFont = &m_resources.loadFont("default", {
-        "./assets/font/NaikaiFont-Regular.ttf",
-        "/usr/share/fonts/google-noto-cjk-fonts/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-    }, 48);
-
     // 1. 註冊 Lua C++ 綁定與連接 Console
     ScriptBindings::registerAll(m_scriptEngine.getRawState(), m_logger);
     m_console.setScriptEngine(&m_scriptEngine);
 
-    // 2. 載入 ./assets/sysScripts/ 裡的所有 Lua 系統腳本
+    // 2. 載入系統腳本
     loadSystemScripts("./assets/sysScripts");
 
-    // 3. 建立場景管理器（純邏輯，徹底移除 UI 渲染）
+    // 3. 建立場景管理器
     m_sceneManager = std::make_unique<SceneManager>(m_eventBus, m_resources, m_logger);
 
-    // 4. ★ 建立 UIManager：全面接管三棵樹生命週期與內部 UIRenderer 封裝
+    // 4. 建立 UIManager：把 FontLoader 拔除，UIManager 內部直接透過 m_resources 管理字體
     m_uiManager = std::make_unique<UIManager>(
         *m_uiShader,
-        *m_defaultFont,
         m_eventBus,
         m_keyboardSystem,
         m_console,

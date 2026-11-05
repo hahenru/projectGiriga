@@ -3,6 +3,8 @@
 
 #include <UI/UIContainer.h>
 #include <UI/UIText.h>
+#include <Resource/ResourceManager.h>
+
 #include <functional>
 #include <string>
 
@@ -26,8 +28,9 @@ public:
     void setColors(const ButtonColors& colors) { m_colors = colors; }
 
     // 設定按鈕標籤文字與字型（將 UIText 作為 child 掛載）
-    UIText* setLabel(const FontLoader& font, const std::u32string& text,
-                     float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f);
+    UIText* setLabel(ResourceManager& resources, const std::u32string& text,
+		float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f,
+		std::string fontName = "default");
 
     UIText* getLabel() const { return m_label; }
 

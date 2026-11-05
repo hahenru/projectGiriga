@@ -6,16 +6,15 @@
 class UIRenderer;
 
 UIWindow::UIWindow(float x, float y, float width, float height,
-                   const FontLoader& font, const std::u32string& title,
-                   unsigned int titleFontSize)
+                   ResourceManager& resources, const std::u32string& title,
+                   unsigned int titleFontSize, std::string fontName)
 : UIElement(x, y, width, height) {
-    // 1. 內容容器綁定：位置相對為 (0, 0)，尺寸同步視窗大小
     m_container.setParent(this);
     m_container.setPosition(0.0f, 0.0f);
     m_container.setSize(width, height);
 
-    // 2. 標題文字持有相對座標 (Local: 10, yOffset)
-    m_titleText = std::make_unique<UIText>(10.0f, 0.0f, font, title, titleFontSize);
+    // ★ 建立 UIText 時傳入 resources 與 fontName
+    m_titleText = std::make_unique<UIText>(10.0f, 0.0f, resources, title, titleFontSize, std::move(fontName));
     m_titleText->setParent(this);
     float textY = (m_titleBarHeight - m_titleText->getHeight()) * 0.5f;
     m_titleText->setPosition(10.0f, textY);

@@ -2,7 +2,6 @@
 #include <Event/Event.h>
 
 UIManager::UIManager(Shader& uiShader,
-                     FontLoader& defaultFont,
                      EventBus& eventBus,
                      KeyboardSystem& keyboard,
                      ConsoleSystem& console,
@@ -10,32 +9,28 @@ UIManager::UIManager(Shader& uiShader,
                      ResourceManager& resources,
                      float screenWidth, float screenHeight)
     : m_renderer(uiShader, screenWidth, screenHeight),
-      m_font(defaultFont),
       m_eventBus(eventBus),
       m_resources(resources),
       m_screenWidth(screenWidth),
       m_screenHeight(screenHeight) {
 
-    // 1. 全域根畫布保持穿透模式
     m_rootUI.setPosition(0.0f, 0.0f);
     m_rootUI.setSize(screenWidth, screenHeight);
     m_rootUI.setPassThrough(true);
 
-    // 2. ★ 掛載 Console：尺寸設為 100% 全螢幕 (寬度 screenWidth, 高度 screenHeight)
+    // ★ 掛載 Console：不需要再傳 m_font
     m_console = m_rootUI.emplaceChild<UIConsole>(
         0.0f, 0.0f, screenWidth, screenHeight,
-        m_font, m_eventBus, console, logger, m_resources
+        m_eventBus, console, logger, m_resources
     );
     m_console->setName("InGameConsole");
     m_console->setVisible(false);
 
-    // 3. 綁定熱鍵
     keyboard.registerShortcut(
         GLFW_KEY_GRAVE_ACCENT, 0,
         [this]() { toggleConsole(); }
     );
 
-    // 4. 監聽所有事件
     bindEvents();
 }
 
