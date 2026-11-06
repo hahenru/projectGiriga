@@ -49,7 +49,7 @@ modules:
   - name: projectGIRIGARA
     buildsystem: simple
     build-commands:
-      - make linux TARGET=build/projectGIRIGARA LDFLAGS="-L/app/lib -L/app/lib64 -L/app/lib/x86_64-linux-gnu -lglfw -lGL -ldl -llua -lpthread $(pkg-config --libs freetype2)"
+      - make linux TARGET=build/projectGIRIGARA LDFLAGS="-L/app/lib -L/app/lib64 -L/app/lib/x86_64-linux-gnu -lglfw -lGL -ldl -llua -lpthread -lasound -lm $(pkg-config --libs freetype2)"
 
       - install -d /app/bin
       - install -d /app/share/com.hahenru.girigara

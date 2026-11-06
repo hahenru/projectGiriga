@@ -18,7 +18,8 @@ CXX = g++
 CC = gcc
 CXXFLAGS = -g -std=c++23 -I./include $(shell pkg-config --cflags freetype2 2>/dev/null)
 CFLAGS = -g -I./include
-LDFLAGS = -lglfw -lGL -ldl -llua -lpthread $(shell pkg-config --libs freetype2 2>/dev/null)
+# 補上 -lasound 與 -lm 供 miniaudio 在 Linux (ALSA/Pulse/PipeWire) 使用
+LDFLAGS = -lglfw -lGL -ldl -llua -lpthread -lasound -lm $(shell pkg-config --libs freetype2 2>/dev/null)
 
 BUILD_DIR = build
 ASSETS_DIR = assets
@@ -32,7 +33,6 @@ WIN_CXX = x86_64-w64-mingw32-g++
 WIN_CC  = x86_64-w64-mingw32-gcc
 WIN_AR  = x86_64-w64-mingw32-ar
 WIN_PREFIX = /usr/x86_64-w64-mingw32/sys-root/mingw
-WIN_LIB_DIR = ./libs/win64
 
 # Vendor Lua 相關路徑 (交叉編譯建置用)
 LUA_DIR = vendor/lua-5.5.1
@@ -44,11 +44,13 @@ WIN_LUA_LIB = $(WIN_LUA_BUILD_DIR)/liblua.a
 LUA_SRCS = $(filter-out $(LUA_SRC_DIR)/lua.c $(LUA_SRC_DIR)/luac.c, $(wildcard $(LUA_SRC_DIR)/*.c))
 WIN_LUA_OBJS = $(patsubst $(LUA_SRC_DIR)/%.c, $(WIN_LUA_BUILD_DIR)/%.o, $(LUA_SRCS))
 
-WIN_CXXFLAGS = -O2 -std=c++23 -I./include -I$(LUA_SRC_DIR) -I$(WIN_LIB_DIR)/include -I$(WIN_PREFIX)/include/freetype2
+# 已移除 -I$(WIN_LIB_DIR)/include，由 MinGW sysroot 與本機 /usr/local/include 接管
+WIN_CXXFLAGS = -O2 -std=c++23 -I./include -I$(LUA_SRC_DIR) -I$(WIN_PREFIX)/include/freetype2
 WIN_CFLAGS   = -O2 -I./include
 
-# 全靜態鏈結：libglfw3.a、liblua.a、libgcc、libstdc++
-WIN_LDFLAGS  = -L$(WIN_LIB_DIR)/lib -L$(WIN_LUA_BUILD_DIR) -L$(WIN_PREFIX)/lib \
+# 已移除 -L$(WIN_LIB_DIR)/lib
+# 保留 -lole32 -lwinmm (miniaudio Windows 音訊後端必備)
+WIN_LDFLAGS  = -L$(WIN_LUA_BUILD_DIR) -L$(WIN_PREFIX)/lib \
                -lglfw3 -llua -lopengl32 -lole32 \
                -lfreetype -lpng -lz -lbz2 \
                -lgdi32 -limm32 -lwinmm -lpthread \
@@ -66,12 +68,11 @@ WIN_NAT_CC  = gcc
 WIN_NAT_CXXFLAGS = -g -std=c++23 -I./include
 WIN_NAT_CFLAGS   = -g -I./include
 WIN_NAT_LDFLAGS  = -mwindows -Wl,--subsystem,windows \
-    -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread \
-	-lole32
+    -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread -lole32 -lwinmm
 
-WIN_NAT_BUILD_DIR = $(BUILD_DIR)\win64_native
-WIN_NAT_TARGET    = $(WIN_NAT_BUILD_DIR)\projectGIRIGARA.exe
-PACKAGE_WIN_NAT   = $(BUILD_DIR)\ProjectGirigara_win64_native.zip
+WIN_NAT_BUILD_DIR = $(BUILD_DIR)/win64_native
+WIN_NAT_TARGET    = $(WIN_NAT_BUILD_DIR)/projectGIRIGARA.exe
+PACKAGE_WIN_NAT   = $(BUILD_DIR)/ProjectGirigara_win64_native.zip
 
 # ==========================================
 # 專案主程式原始碼
@@ -83,8 +84,9 @@ SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
       src/MainMenuScene.cpp src/GameScene.cpp src/ScriptEngine.cpp \
       src/ScriptBindings.cpp src/ScriptResource.cpp src/ConsoleSystem.cpp \
       src/FontLoader.cpp src/UIVerticalLayout.cpp src/UISlantedLayout.cpp \
-	  src/UIRenderer.cpp src/UIManager.cpp src/FontResource.cpp \
-	  src/AudioResource.cpp src/miniaudio_impl.cpp scr/AudioSystem.cpp
+      src/UIRenderer.cpp src/UIManager.cpp src/FontResource.cpp \
+      src/AudioResource.cpp src/miniaudio_impl.cpp src/AudioSystem.cpp \
+      src/LuaScene.cpp
 
 # Linux / 交叉編譯目標檔路徑
 OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
@@ -103,7 +105,7 @@ all: linux win64 rpm flatpak
 # ==========================================
 # Linux 原生建置流程
 # ==========================================
-linux: $(TARGET) copy_assets_linux clean_linux_objs package_linux
+linux: $(TARGET) copy_assets_linux package_linux
 
 $(TARGET): $(OBJS) | $(BUILD_DIR)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
@@ -131,7 +133,7 @@ package_linux: $(TARGET) copy_assets_linux
 # ==========================================
 # Windows 交叉編譯流程 (在 Linux 主機上執行)
 # ==========================================
-win64: $(WIN_LUA_LIB) $(WIN_TARGET) copy_assets_win clean_win_objs package_win
+win64: $(WIN_LUA_LIB) $(WIN_TARGET) copy_assets_win package_win
 
 $(WIN_LUA_LIB): $(WIN_LUA_OBJS)
 	@echo "==> 打包 Windows 靜態庫 $(WIN_LUA_LIB) ..."
@@ -175,7 +177,7 @@ package_win: $(WIN_TARGET) copy_assets_win
 # ==========================================
 # Windows 原生編譯流程 (在 Windows 主機 CMD 下執行)
 # ==========================================
-win64-native: $(WIN_NAT_TARGET) copy_assets_win_nat clean_win_nat_objs package_win_nat
+win64-native: package_win_nat
 
 $(WIN_NAT_TARGET): $(WIN_NAT_OBJS) | $(WIN_NAT_BUILD_DIR)
 	@echo [LD] 連結 $@ ...
@@ -190,21 +192,21 @@ $(WIN_NAT_BUILD_DIR)/%.o: src/%.c | $(WIN_NAT_BUILD_DIR)
 	$(WIN_NAT_CC) $(WIN_NAT_CFLAGS) -c $< -o $@
 
 $(WIN_NAT_BUILD_DIR):
-	@if not exist $(WIN_NAT_BUILD_DIR) mkdir $(WIN_NAT_BUILD_DIR)
+	@if not exist "$@" mkdir "$@"
 
 copy_assets_win_nat: | $(WIN_NAT_BUILD_DIR)
 	@echo [ASSETS] 複製 assets 資料夾...
-	@if exist $(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR) rmdir /S /Q $(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)
-	@xcopy /E /I /Q /Y $(ASSETS_DIR) $(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR) >nul
+	@if exist "$(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)" rmdir /S /Q "$(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)"
+	@xcopy /E /I /Q /Y $(ASSETS_DIR) "$(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)" >nul
 
 clean_win_nat_objs:
 	@echo [CLEAN] 清理 Windows 原生中間暫存檔 (*.o)...
-	@if exist $(WIN_NAT_BUILD_DIR)\*.o del /Q $(WIN_NAT_BUILD_DIR)\*.o
+	@if exist "$(WIN_NAT_BUILD_DIR)\*.o" del /Q "$(WIN_NAT_BUILD_DIR)\*.o"
 
 package_win_nat: $(WIN_NAT_TARGET) copy_assets_win_nat
 	@echo [PACKAGE] 打包 Windows 發布包至 $(PACKAGE_WIN_NAT) ...
-	@if exist $(PACKAGE_WIN_NAT) del /Q $(PACKAGE_WIN_NAT)
-	@tar -a -c -f $(PACKAGE_WIN_NAT) -C $(WIN_NAT_BUILD_DIR) $(notdir $(WIN_NAT_TARGET)) $(ASSETS_DIR)
+	@if exist "build\ProjectGirigara_win64_native.zip" del /Q "build\ProjectGirigara_win64_native.zip"
+	@cd build\win64_native && tar -a -c -f "..\ProjectGirigara_win64_native.zip" projectGIRIGARA.exe assets
 	@echo [OK] Windows 原生發布包打包完成！
 
 # 版本號與前綴
@@ -247,7 +249,7 @@ ifeq ($(HOST_OS),Windows)
 	@echo 清理建置輸出目錄 (Windows)...
 	@if exist $(BUILD_DIR) rmdir /S /Q $(BUILD_DIR)
 else
-	@echo "==> 清理建置輸出目錄 (Linux)..."
+	@echo "清理建置輸出目錄 (Linux)..."
 	rm -rf $(BUILD_DIR) $(FLATPAK_BUILD_DIR) $(FLATPAK_REPO)
 endif
 

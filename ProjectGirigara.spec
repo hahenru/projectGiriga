@@ -12,11 +12,13 @@ BuildRequires:  pkgconfig(freetype2)
 BuildRequires:  glfw-devel
 BuildRequires:  libGL-devel
 BuildRequires:  lua-devel
+BuildRequires:  alsa-lib-devel
 
 # 執行期動態依賴 (可由 rpmbuild 自動分析，或明確標記)
 Requires:       glfw
 Requires:       lua
 Requires:       freetype
+Requires:       alsa-lib
 
 %description
 ProjectGirigara is a low-performance 2D game engine and GUI toolkit
@@ -58,24 +60,15 @@ exec ./projectGIRIGARA "$@"
 EOF
 chmod 755 %{buildroot}/usr/bin/girigara
 
-# 4. (選用) 建立 Desktop 捷徑
+# 4. 安裝現有的標準 Desktop 捷徑
 mkdir -p %{buildroot}/usr/share/applications
-cat << 'EOF' > %{buildroot}/usr/share/applications/%{name}.desktop
-[Desktop Entry]
-Name=Project Girigara
-Comment=Girigara Game Window
-Exec=girigara
-# Icon=applications-games
-Terminal=false
-Type=Application
-Categories=Game;Development;
-EOF
+install -m 644 com.hahenru.girigara.desktop %{buildroot}/usr/share/applications/com.hahenru.girigara.desktop
 
 %files
 /opt/%{name}/projectGIRIGARA
 /opt/%{name}/assets
 /usr/bin/girigara
-/usr/share/applications/%{name}.desktop
+/usr/share/applications/com.hahenru.girigara.desktop
 /usr/share/icons/hicolor/512x512/apps/com.hahenru.girigara.png
 
 %changelog
