@@ -8,17 +8,27 @@ UIManager::UIManager(Shader& uiShader,
                      LoggerSystem& logger,
                      ResourceManager& resources,
                      float screenWidth, float screenHeight)
-    : m_renderer(uiShader, screenWidth, screenHeight),
-      m_eventBus(eventBus),
-      m_resources(resources),
-      m_screenWidth(screenWidth),
-      m_screenHeight(screenHeight) {
+: m_renderer(uiShader, screenWidth, screenHeight),
+m_eventBus(eventBus),
+m_resources(resources),
+m_screenWidth(screenWidth),
+m_screenHeight(screenHeight) {
 
     m_rootUI.setPosition(0.0f, 0.0f);
     m_rootUI.setSize(screenWidth, screenHeight);
     m_rootUI.setPassThrough(true);
 
-    // ★ 掛載 Console：不需要再傳 m_font
+    // 1. 掛載設定選單 (先於 Console，確保 Console 絕對置頂)
+    float menuW = screenWidth * 0.75f;
+    float menuH = screenHeight * 0.75f;
+    m_settingsMenu = m_rootUI.emplaceChild<UISettingsMenu>(
+        (screenWidth - menuW) * 0.5f,
+                                                           (screenHeight - menuH) * 0.5f,
+                                                           menuW, menuH,
+                                                           m_resources, m_eventBus
+    );
+
+    // 2. 掛載 Console
     m_console = m_rootUI.emplaceChild<UIConsole>(
         0.0f, 0.0f, screenWidth, screenHeight,
         m_eventBus, console, logger, m_resources
@@ -26,12 +36,41 @@ UIManager::UIManager(Shader& uiShader,
     m_console->setName("InGameConsole");
     m_console->setVisible(false);
 
+    // 3. 註冊波浪鍵呼叫 Console
     keyboard.registerShortcut(
         GLFW_KEY_GRAVE_ACCENT, 0,
         [this]() { toggleConsole(); }
     );
 
+    // 4. ★ 註冊 ESC 呼叫設定選單 (由 UIManager 統一管理層級優先權)
+    keyboard.registerShortcut(
+        GLFW_KEY_ESCAPE, 0,
+        [this]() { toggleSettingsMenu(); }
+    );
+
     bindEvents();
+}
+
+void UIManager::toggleSettingsMenu() {
+    if (!m_settingsMenu) return;
+
+    // ★ 防禦 1：如果 Console 正開著，ESC 的優先權是關閉 Console，不觸發設定選單
+    if (m_console && m_console->isVisible()) {
+        toggleConsole();
+        return;
+    }
+
+    // ★ 防禦 2：正常切換設定選單開關
+    bool next = !m_settingsMenu->isVisible();
+    m_settingsMenu->setVisible(next);
+
+    if (next) {
+        m_rootUI.setFocusedElement(m_settingsMenu);
+    } else {
+        if (m_rootUI.getFocusedElement() == m_settingsMenu) {
+            m_rootUI.setFocusedElement(nullptr);
+        }
+    }
 }
 
 void UIManager::onWindowResize(float width, float height) {
@@ -46,6 +85,13 @@ void UIManager::onWindowResize(float width, float height) {
     }
     if (m_activeSceneUI) {
         m_activeSceneUI->setSize(width, height);
+    }
+    // ★ 關鍵修復：視窗縮放時，重新計算設定選單的置中座標與寬高（占 75%）
+    if (m_settingsMenu) {
+        float menuW = width * 1.0f;
+        float menuH = height * 1.0f;
+        m_settingsMenu->setPosition((width - menuW) * 0.5f, (height - menuH) * 0.5f);
+        m_settingsMenu->setSize(menuW, menuH);
     }
 }
 

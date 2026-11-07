@@ -10,6 +10,7 @@ class UIRenderer;
 class UIContainer : public UIElement {
 public:
     UIContainer() = default;
+    UIContainer(float x, float y) : UIElement(x, y, 0.0f, 0.0f) {}
     UIContainer(float x, float y, float width, float height)
     : UIElement(x, y, width, height) {}
     ~UIContainer() override = default;

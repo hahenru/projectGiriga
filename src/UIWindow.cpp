@@ -50,9 +50,9 @@ void UIWindow::initCloseButton() {
     );
     m_closeButton->setParent(this);
     m_closeButton->setColors({
-        {0.8f, 0.2f, 0.2f, 1.0f},
-        {1.0f, 0.3f, 0.3f, 1.0f},
-        {0.6f, 0.1f, 0.1f, 1.0f}
+        .normal  = {0.8f, 0.2f, 0.2f, 1.0f},
+        .hovered = {1.0f, 0.3f, 0.3f, 1.0f},
+        .pressed = {0.6f, 0.1f, 0.1f, 1.0f}
     });
     m_closeButton->setOnClick([this]() {
         setVisible(false);

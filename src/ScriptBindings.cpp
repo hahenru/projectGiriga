@@ -1,5 +1,6 @@
 #include <Script/ScriptBindings.h>
-#include <Audio/AudioSystem.h>      // ★ 1. 補上完整定義，解決 incomplete type
+#include <Audio/AudioSystem.h>
+#include <System/SettingsRegistry.h>
 #include <Script/LuaRef.h>
 #include <UI/UIElement.h>
 #include <UI/UIRegistry.h>
@@ -16,6 +17,7 @@ extern "C" {
 namespace {
     constexpr const char* LOGGER_REGISTRY_KEY = "GIRIGARA_LOGGER_INSTANCE";
     constexpr const char* AUDIO_REGISTRY_KEY  = "GIRIGARA_AUDIO_INSTANCE";
+    constexpr const char* SETTINGS_REGISTRY_KEY = "GIRIGARA_SETTINGS_INSTANCE";
 
     LoggerSystem* getLoggerFromLua(lua_State* L) {
         lua_pushstring(L, LOGGER_REGISTRY_KEY);
@@ -32,6 +34,28 @@ namespace {
         auto* audio = static_cast<AudioSystem*>(lua_touserdata(L, -1));
         lua_pop(L, 1);
         return audio;
+    }
+
+    SettingsRegistry* getSettingsFromLua(lua_State* L) {
+        lua_pushstring(L, SETTINGS_REGISTRY_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        auto* settings = static_cast<SettingsRegistry*>(lua_touserdata(L, -1));
+        lua_pop(L, 1);
+        return settings;
+    }
+
+    // 輔助函式：從 Lua Stack 解析多型 SettingValue
+    SettingValue parseSettingValueFromLua(lua_State* L, int idx) {
+        if (lua_isboolean(L, idx)) {
+            return (lua_toboolean(L, idx) != 0);
+        } else if (lua_isinteger(L, idx)) {
+            return static_cast<int>(lua_tointeger(L, idx));
+        } else if (lua_isnumber(L, idx)) {
+            return static_cast<float>(lua_tonumber(L, idx));
+        } else if (lua_isstring(L, idx)) {
+            return std::string(lua_tostring(L, idx));
+        }
+        return false;
     }
 
     // 1. 綁定 Update 回調: BindUIUpdate(elementPtr, function(self, dt) ... end)
@@ -223,11 +247,48 @@ namespace {
         }
         return 0;
     }
+
+    // 1. ChangeSettingByName("Audio.Volume.BGM", 0.8)
+    int lua_ChangeSettingByName(lua_State* L) {
+        SettingsRegistry* settings = getSettingsFromLua(L);
+        if (!settings) return 0;
+
+        const char* path = luaL_checkstring(L, 1);
+        SettingValue val = parseSettingValueFromLua(L, 2);
+
+        bool success = settings->setByName(path, val, true);
+        lua_pushboolean(L, success ? 1 : 0);
+        return 1;
+    }
+
+    // 2. ChangeSettingByUUID(uuid, 0.8)
+    int lua_ChangeSettingByUUID(lua_State* L) {
+        SettingsRegistry* settings = getSettingsFromLua(L);
+        if (!settings) return 0;
+
+        uint64_t uuid = static_cast<uint64_t>(luaL_checkinteger(L, 1));
+        SettingValue val = parseSettingValueFromLua(L, 2);
+
+        bool success = settings->setByUUID(uuid, val, true);
+        lua_pushboolean(L, success ? 1 : 0);
+        return 1;
+    }
+
+    // 3. SetSettingEnabled(uuid, enabled) -> 控制圖形 UI 開關 (Active/Disable)
+    int lua_SetSettingEnabled(lua_State* L) {
+        SettingsRegistry* settings = getSettingsFromLua(L);
+        if (!settings) return 0;
+
+        uint64_t uuid = static_cast<uint64_t>(luaL_checkinteger(L, 1));
+        bool enabled = (lua_toboolean(L, 2) != 0);
+
+        settings->setEnabled(uuid, enabled);
+        return 0;
+    }
 }
 
 namespace ScriptBindings {
-    // ★ 3. 實作簽名對齊 Header：補上 AudioSystem& audio
-    void registerAll(lua_State* L, LoggerSystem& logger, AudioSystem& audio) {
+    void registerAll(lua_State* L, LoggerSystem& logger, AudioSystem& audio, SettingsRegistry& settings) {
         if (!L) return;
 
         // 保存 Logger 與 Audio 指標至 Lua 註冊表
@@ -238,6 +299,15 @@ namespace ScriptBindings {
         lua_pushstring(L, AUDIO_REGISTRY_KEY);
         lua_pushlightuserdata(L, &audio);
         lua_settable(L, LUA_REGISTRYINDEX);
+
+        lua_pushstring(L, SETTINGS_REGISTRY_KEY);
+        lua_pushlightuserdata(L, &settings);
+        lua_settable(L, LUA_REGISTRYINDEX);
+
+        // 設定相關API
+        lua_register(L, "ChangeSettingByName", lua_ChangeSettingByName);
+        lua_register(L, "ChangeSettingByUUID", lua_ChangeSettingByUUID);
+        lua_register(L, "SetSettingEnabled", lua_SetSettingEnabled);
 
         // 核心更新與輸出 API
         lua_register(L, "BindUIUpdate", lua_BindUIUpdate);

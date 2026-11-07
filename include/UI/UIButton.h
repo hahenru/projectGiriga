@@ -5,18 +5,21 @@
 #include <UI/UIText.h>
 #include <Resource/ResourceManager.h>
 
+#include <array>
 #include <functional>
 #include <string>
 
+using ColorRGBA = std::array<float, 4>;
+
 struct ButtonColors {
-    float normal[4]  = {0.25f, 0.55f, 0.95f, 1.0f};
-    float hovered[4] = {0.35f, 0.65f, 1.0f,  1.0f};
-    float pressed[4] = {0.18f, 0.45f, 0.85f, 1.0f};
+    ColorRGBA normal   = {0.25f, 0.55f, 0.95f, 1.0f};
+    ColorRGBA hovered  = {0.35f, 0.65f, 1.0f,  1.0f};
+    ColorRGBA pressed  = {0.18f, 0.45f, 0.85f, 1.0f};
+    ColorRGBA disabled = {0.20f, 0.20f, 0.20f, 0.60f}; // 鎖定與冷卻中的視覺灰色
 };
 
 class UIRenderer;
 
-// ★ 繼承 UIContainer，具備完整的子節點管理與標髒傳播能力
 class UIButton : public UIContainer {
 public:
     using ClickCallback = std::function<void()>;
@@ -27,10 +30,18 @@ public:
     void setOnClick(ClickCallback callback) { m_onClick = std::move(callback); }
     void setColors(const ButtonColors& colors) { m_colors = colors; }
 
-    // 設定按鈕標籤文字與字型（將 UIText 作為 child 掛載）
+    // 冷卻時間設定（單位：秒，0.0f 代表不啟用冷卻）
+    void setCooldownDuration(float seconds) { m_cooldownDuration = seconds; }
+    bool isOnCooldown() const { return m_cooldownTimer > 0.0f; }
+
+    // 手動/群組互斥鎖定（true 代表鎖死不可點擊）
+    void setLocked(bool locked) { m_isLocked = locked; if (locked) m_isPressed = false; }
+    bool isLocked() const { return m_isLocked; }
+
+    // 設定按鈕標籤文字與字型
     UIText* setLabel(ResourceManager& resources, const std::u32string& text,
-		float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f,
-		std::string fontName = "default");
+                     float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f,
+                     std::string fontName = "default");
 
     UIText* getLabel() const { return m_label; }
 
@@ -43,16 +54,19 @@ public:
     bool isHovered() const { return m_isHovered; }
     bool isPressed() const { return m_isPressed; }
 
-    // 當按鈕自身尺寸變更時，自動重新計算文字居中
     void setSize(float width, float height);
 
 private:
     bool m_isHovered = false;
     bool m_isPressed = false;
+    bool m_isLocked  = false;
+    float m_cooldownTimer = 0.0f;
+    float m_cooldownDuration = 0.0f;
+
     ButtonColors m_colors;
     ClickCallback m_onClick = nullptr;
 
-    UIText* m_label = nullptr; // 弱引用，所有權在 UIContainer::m_children 裡
+    UIText* m_label = nullptr;
     void updateLabelPosition();
 };
 

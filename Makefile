@@ -16,9 +16,8 @@ endif
 # ==========================================
 CXX = g++
 CC = gcc
-CXXFLAGS = -g -std=c++23 -I./include $(shell pkg-config --cflags freetype2 2>/dev/null)
-CFLAGS = -g -I./include
-# 補上 -lasound 與 -lm 供 miniaudio 在 Linux (ALSA/Pulse/PipeWire) 使用
+CXXFLAGS = -g -std=c++23 -MMD -MP -I./include $(shell pkg-config --cflags freetype2 2>/dev/null)
+CFLAGS = -g -MMD -MP -I./include
 LDFLAGS = -lglfw -lGL -ldl -llua -lpthread -lasound -lm $(shell pkg-config --libs freetype2 2>/dev/null)
 
 BUILD_DIR = build
@@ -31,26 +30,13 @@ PACKAGE_LINUX = $(BUILD_DIR)/ProjectGirigara_linux.tar.gz
 # ==========================================
 WIN_CXX = x86_64-w64-mingw32-g++
 WIN_CC  = x86_64-w64-mingw32-gcc
-WIN_AR  = x86_64-w64-mingw32-ar
 WIN_PREFIX = /usr/x86_64-w64-mingw32/sys-root/mingw
 
-# Vendor Lua 相關路徑 (交叉編譯建置用)
-LUA_DIR = vendor/lua-5.5.1
-LUA_SRC_DIR = $(LUA_DIR)/src
-WIN_LUA_BUILD_DIR = $(BUILD_DIR)/win64_lua
-WIN_LUA_LIB = $(WIN_LUA_BUILD_DIR)/liblua.a
+# 由 MinGW sys-root 接管 lua.h、freetype2 與 liblua.a
+WIN_CXXFLAGS = -O2 -std=c++23 -MMD -MP -I./include -I$(WIN_PREFIX)/include/freetype2
+WIN_CFLAGS   = -O2 -MMD -MP -I./include
 
-# 篩選 Lua 核心 C 檔案（自動排除 standalone 的 lua.c 與 luac.c）
-LUA_SRCS = $(filter-out $(LUA_SRC_DIR)/lua.c $(LUA_SRC_DIR)/luac.c, $(wildcard $(LUA_SRC_DIR)/*.c))
-WIN_LUA_OBJS = $(patsubst $(LUA_SRC_DIR)/%.c, $(WIN_LUA_BUILD_DIR)/%.o, $(LUA_SRCS))
-
-# 已移除 -I$(WIN_LIB_DIR)/include，由 MinGW sysroot 與本機 /usr/local/include 接管
-WIN_CXXFLAGS = -O2 -std=c++23 -I./include -I$(LUA_SRC_DIR) -I$(WIN_PREFIX)/include/freetype2
-WIN_CFLAGS   = -O2 -I./include
-
-# 已移除 -L$(WIN_LIB_DIR)/lib
-# 保留 -lole32 -lwinmm (miniaudio Windows 音訊後端必備)
-WIN_LDFLAGS  = -L$(WIN_LUA_BUILD_DIR) -L$(WIN_PREFIX)/lib \
+WIN_LDFLAGS  = -L$(WIN_PREFIX)/lib \
                -lglfw3 -llua -lopengl32 -lole32 \
                -lfreetype -lpng -lz -lbz2 \
                -lgdi32 -limm32 -lwinmm -lpthread \
@@ -86,7 +72,8 @@ SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
       src/FontLoader.cpp src/UIVerticalLayout.cpp src/UISlantedLayout.cpp \
       src/UIRenderer.cpp src/UIManager.cpp src/FontResource.cpp \
       src/AudioResource.cpp src/miniaudio_impl.cpp src/AudioSystem.cpp \
-      src/LuaScene.cpp
+      src/LuaScene.cpp src/UIPanel.cpp src/UIHorizontalLayout.cpp \
+      src/UISettingsMenu.cpp
 
 # Linux / 交叉編譯目標檔路徑
 OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
@@ -98,6 +85,9 @@ WIN_OBJS = $(patsubst src/%.cpp, $(WIN_BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) 
 # Windows 原生編譯目標檔路徑
 WIN_NAT_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
                $(patsubst src/%.c, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.c, $(SRC)))
+
+# 追蹤相依性 .d 檔案
+DEPS = $(OBJS:.o=.d) $(WIN_OBJS:.o=.d)
 
 # Linux 預設總建置目標
 all: linux win64 rpm flatpak
@@ -124,7 +114,7 @@ copy_assets_linux: | $(BUILD_DIR)
 	@cp -r $(ASSETS_DIR) $(BUILD_DIR)/
 
 clean_linux_objs:
-	@rm -f $(BUILD_DIR)/*.o
+	@rm -f $(BUILD_DIR)/*.o $(BUILD_DIR)/*.d
 
 package_linux: $(TARGET) copy_assets_linux
 	@echo "==> 打包 Linux 發布包至 $(PACKAGE_LINUX) ..."
@@ -133,19 +123,9 @@ package_linux: $(TARGET) copy_assets_linux
 # ==========================================
 # Windows 交叉編譯流程 (在 Linux 主機上執行)
 # ==========================================
-win64: $(WIN_LUA_LIB) $(WIN_TARGET) copy_assets_win package_win
+win64: $(WIN_TARGET) copy_assets_win package_win
 
-$(WIN_LUA_LIB): $(WIN_LUA_OBJS)
-	@echo "==> 打包 Windows 靜態庫 $(WIN_LUA_LIB) ..."
-	$(WIN_AR) rcs $@ $(WIN_LUA_OBJS)
-
-$(WIN_LUA_BUILD_DIR)/%.o: $(LUA_SRC_DIR)/%.c | $(WIN_LUA_BUILD_DIR)
-	$(WIN_CC) -O2 -c $< -o $@
-
-$(WIN_LUA_BUILD_DIR):
-	mkdir -p $(WIN_LUA_BUILD_DIR)
-
-$(WIN_TARGET): $(WIN_OBJS) $(WIN_LUA_LIB) | $(WIN_BUILD_DIR)
+$(WIN_TARGET): $(WIN_OBJS) | $(WIN_BUILD_DIR)
 	@echo "==> 靜態鏈結 $(WIN_TARGET) ..."
 	$(WIN_CXX) $(WIN_OBJS) -o $@ $(WIN_LDFLAGS)
 
@@ -164,9 +144,8 @@ copy_assets_win: | $(WIN_BUILD_DIR)
 	@cp -r $(ASSETS_DIR) $(WIN_BUILD_DIR)/
 
 clean_win_objs:
-	@echo "==> 清理 Windows 中間檔案 (*.o)..."
-	@rm -f $(WIN_BUILD_DIR)/*.o
-	@rm -rf $(WIN_LUA_BUILD_DIR)
+	@echo "==> 清理 Windows 中間檔案 (*.o, *.d)..."
+	@rm -f $(WIN_BUILD_DIR)/*.o $(WIN_BUILD_DIR)/*.d
 
 package_win: $(WIN_TARGET) copy_assets_win
 	@echo "==> 壓縮 Windows 發布包至 $(PACKAGE_WIN)..."
@@ -252,6 +231,9 @@ else
 	@echo "清理建置輸出目錄 (Linux)..."
 	rm -rf $(BUILD_DIR) $(FLATPAK_BUILD_DIR) $(FLATPAK_REPO)
 endif
+
+# 自動載入相依性清單
+-include $(DEPS)
 
 .PHONY: all linux win64 win64-native copy_assets_linux clean_linux_objs package_linux \
         copy_assets_win clean_win_objs package_win copy_assets_win_nat clean_win_nat_objs \

@@ -3,6 +3,7 @@
 
 #include <UI/UIContainer.h>
 #include <UI/UIConsole.h>
+#include <UI/UISettingsMenu.h>
 #include <Renderer/UIRenderer.h>
 #include <Resource/ResourceManager.h>
 #include <Font/FontLoader.h>
@@ -35,6 +36,7 @@ public:
     UIManager& operator=(const UIManager&) = delete;
 
     void toggleConsole();
+    void toggleSettingsMenu();
     UIConsole* getConsole() { return m_console; }
     UIContainer& getRootUI() { return m_rootUI; }
 
@@ -55,6 +57,7 @@ private:
     std::vector<DyingUIEntry> m_dyingSceneUI;               // 3) 延遲消亡隊列
 
     UIConsole* m_console{nullptr};
+    UISettingsMenu* m_settingsMenu{nullptr};
     float m_screenWidth = 800.0f;
     float m_screenHeight = 600.0f;
 };

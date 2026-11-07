@@ -31,6 +31,16 @@ WindowManager::WindowManager(int width, int height, const std::string& title, Ev
 
 WindowManager::~WindowManager() {
     if (m_window) {
+        // ★ 核心修復：在銷毀前先切斷 UserPointer 與所有 Callback，避免 Wayland 關閉時回呼已經死掉的系統
+        glfwSetWindowUserPointer(m_window, nullptr);
+        glfwSetCursorPosCallback(m_window, nullptr);
+        glfwSetMouseButtonCallback(m_window, nullptr);
+        glfwSetKeyCallback(m_window, nullptr);
+        glfwSetCharCallback(m_window, nullptr);
+        glfwSetWindowFocusCallback(m_window, nullptr);
+        glfwSetFramebufferSizeCallback(m_window, nullptr);
+        glfwSetScrollCallback(m_window, nullptr);
+
         glfwDestroyWindow(m_window);
         m_window = nullptr;
     }

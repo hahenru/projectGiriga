@@ -4,16 +4,14 @@
 #include <GLFW/glfw3.h>
 
 UIButton::UIButton(float x, float y, float width, float height)
-    : UIContainer(x, y, width, height) {
-    // 按鈕本身不是穿透容器，未被子節點處理的點擊要攔截
+: UIContainer(x, y, width, height) {
     setPassThrough(false);
 }
 
 UIText* UIButton::setLabel(ResourceManager& resources, const std::u32string& text,
-                           float r, float g, float b, float a,
-                           std::string fontName) {
+                            float r, float g, float b, float a,
+                            std::string fontName) {
     if (!m_label) {
-        // ★ 透過 UIContainer 的 emplaceChild 掛載，傳入 resources
         m_label = emplaceChild<UIText>(0.0f, 0.0f, resources, text, 0, std::move(fontName));
     } else {
         m_label->setText(text);
@@ -32,7 +30,6 @@ void UIButton::setSize(float width, float height) {
 void UIButton::updateLabelPosition() {
     if (!m_label) return;
 
-    // 取得換算後真正的局部像素寬高
     float curW = getLocalWidth();
     float curH = getLocalHeight();
     float lblW = m_label->getLocalWidth();
@@ -47,7 +44,14 @@ void UIButton::updateLabelPosition() {
 void UIButton::update(float dt) {
     UIContainer::update(dt);
 
-    // 當按鈕可能因為百分比換算產生尺寸變動時，保持文字居中
+    // 冷卻計時器倒數
+    if (m_cooldownTimer > 0.0f) {
+        m_cooldownTimer -= dt;
+        if (m_cooldownTimer < 0.0f) {
+            m_cooldownTimer = 0.0f;
+        }
+    }
+
     if (m_label && isTransformDirty()) {
         updateLabelPosition();
     }
@@ -56,18 +60,20 @@ void UIButton::update(float dt) {
 void UIButton::render(UIRenderer& renderer) {
     if (!isVisible()) return;
 
-    // 1. 決定目前狀態顏色
-    const float* activeColor = m_colors.normal;
-    if (m_isPressed) {
-        activeColor = m_colors.pressed;
+    // 1. 決定目前狀態顏色（冷卻或鎖死時使用 disabled 灰色）
+    const float* activeColor = m_colors.normal.data();
+    if (m_isLocked || m_cooldownTimer > 0.0f) {
+        activeColor = m_colors.disabled.data();
+    } else if (m_isPressed) {
+        activeColor = m_colors.pressed.data();
     } else if (m_isHovered) {
-        activeColor = m_colors.hovered;
+        activeColor = m_colors.hovered.data();
     }
 
     // 2. 繪製按鈕底色
     renderer.drawQuad(getGlobalX(), getGlobalY(), getLocalWidth(), getLocalHeight(), activeColor);
 
-    // 3. 呼叫 UIContainer::render，自動繪製底下的所有子節點（包含 m_label）！
+    // 3. 繪製子節點
     UIContainer::render(renderer);
 }
 
@@ -77,11 +83,10 @@ bool UIButton::handleMouseMove(double x, double y) {
         return false;
     }
 
-    // 優先讓子元件有機會處理（若有需要），但通常 UIText handleMouseMove 會回傳 false 穿透
     UIContainer::handleMouseMove(x, y);
 
     m_isHovered = contains(x, y);
-    if (!m_isHovered) {
+    if (!m_isHovered || m_isLocked || m_cooldownTimer > 0.0f) {
         m_isPressed = false;
     }
 
@@ -91,17 +96,30 @@ bool UIButton::handleMouseMove(double x, double y) {
 bool UIButton::handleMouseButton(int button, int action, int mods, double x, double y) {
     if (!isVisible()) return false;
 
-    // 1. 優先由子元件處理（例如按鈕裡面內嵌了其它小元件）
-    // 但因為 UIText::handleMouseButton 永遠回傳 false，事件會自然漏給按鈕自身處理
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
             if (contains(x, y)) {
+                // 若被鎖定或冷卻中：吞噬點擊但不進入按壓狀態
+                if (m_isLocked || m_cooldownTimer > 0.0f) {
+                    return true;
+                }
                 m_isPressed = true;
                 return true;
             }
         } else if (action == GLFW_RELEASE) {
             if (m_isPressed && contains(x, y)) {
                 m_isPressed = false;
+
+                // 再次雙重防禦：冷卻中或鎖死則忽略
+                if (m_isLocked || m_cooldownTimer > 0.0f) {
+                    return true;
+                }
+
+                // 進入冷卻
+                if (m_cooldownDuration > 0.0f) {
+                    m_cooldownTimer = m_cooldownDuration;
+                }
+
                 if (m_onClick) {
                     m_onClick();
                 }

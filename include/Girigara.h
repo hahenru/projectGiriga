@@ -21,6 +21,7 @@
 #include <Scene/LuaScene.h>
 #include <UI/UIManager.h>
 #include <Audio/AudioSystem.h>
+#include <System/SettingsRegistry.h>
 
 class Girigara {
 public:
@@ -64,6 +65,7 @@ private:
     std::unique_ptr<WindowManager> m_window;
     ResourceManager m_resources;
 	AudioSystem m_audio;
+    SettingsRegistry m_settings;
     ScriptEngine m_scriptEngine;
     ConsoleSystem m_console;
     std::unique_ptr<SceneManager> m_sceneManager;
