@@ -16,8 +16,8 @@ endif
 # ==========================================
 CXX = g++
 CC = gcc
-CXXFLAGS = -g -std=c++23 -MMD -MP -I./include $(shell pkg-config --cflags freetype2 2>/dev/null)
-CFLAGS = -g -MMD -MP -I./include
+CXXFLAGS = -g -std=c++23 -MMD -MP -fPIE -I./include $(shell pkg-config --cflags freetype2 2>/dev/null)
+CFLAGS = -g -MMD -MP -fPIE -I./include
 LDFLAGS = -lglfw -lGL -ldl -llua -lpthread -lasound -lm $(shell pkg-config --libs freetype2 2>/dev/null)
 
 BUILD_DIR = build
@@ -189,7 +189,7 @@ package_win_nat: $(WIN_NAT_TARGET) copy_assets_win_nat
 	@echo [OK] Windows 原生發布包打包完成！
 
 # 版本號與前綴
-VERSION = 0.1.0
+VERSION = 0.1.5
 
 # ==========================================
 # RPM 打包目標 (Linux 專用)

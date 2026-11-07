@@ -1,5 +1,5 @@
 Name:           ProjectGirigara
-Version:        0.1.4
+Version:        0.1.5
 Release:        0.1.alpha%{?dist}
 Summary:        Girigara Game Engine Application
 License:        Proprietary
