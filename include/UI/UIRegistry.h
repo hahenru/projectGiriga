@@ -32,12 +32,20 @@ public:
 
     // 物件解構時自動註銷
     void unregisterElement(uint64_t uuid, const std::string& name) {
-        m_byUUID.erase(uuid);
+        // 先尋找 UUID 對應的指標，避免被提前 erase 導致無法比對
+        auto uuidIt = m_byUUID.find(uuid);
+        UIElement* targetElem = (uuidIt != m_byUUID.end()) ? uuidIt->second : nullptr;
+
         if (!name.empty()) {
-            auto it = m_byName.find(name);
-            if (it != m_byName.end() && it->second == m_byUUID[uuid]) {
-                m_byName.erase(it);
+            auto nameIt = m_byName.find(name);
+            // 只要指標一致，或是只給了 name (uuid為0)，就予以註銷
+            if (nameIt != m_byName.end() && (targetElem == nullptr || nameIt->second == targetElem)) {
+                m_byName.erase(nameIt);
             }
+        }
+
+        if (uuidIt != m_byUUID.end()) {
+            m_byUUID.erase(uuidIt);
         }
     }
 

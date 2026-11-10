@@ -17,7 +17,8 @@ UIElement::~UIElement() {
 }
 
 void UIElement::setName(const std::string& name) {
-    UIRegistry::getInstance().unregisterElement(0, m_name);
+    // 修正：註銷時傳入真實自身 m_uuid，確保正確移除舊鍵值映射
+    UIRegistry::getInstance().unregisterElement(m_uuid, m_name);
     Identifiable::setName(name);
     UIRegistry::getInstance().registerElement(m_uuid, m_name, this);
 }
@@ -117,6 +118,8 @@ void UIElement::setScriptUpdate(LuaRef callback) {
 void UIElement::onUpdate(float dt) {
     if (m_scriptUpdate.isValid()) {
         lua_State* L = m_scriptUpdate.getState();
+        // 修正：記錄進入前的棧深，保證高頻調用時絕對棧平衡
+        int top = lua_gettop(L);
 
         m_scriptUpdate.push();
         lua_pushlightuserdata(L, this);
@@ -125,8 +128,9 @@ void UIElement::onUpdate(float dt) {
         if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
             const char* err = lua_tostring(L, -1);
             std::cerr << "[Lua Script Error in Update] " << (err ? err : "Unknown") << "\n";
-            lua_pop(L, 1);
         }
+        // 無論腳本成功或拋出錯誤，強制將棧指標恢復至原點
+        lua_settop(L, top);
     }
 }
 
@@ -136,7 +140,7 @@ void UIElement::updateGlobalTransform() const {
         float parentGX = m_parent ? m_parent->getGlobalX() : 0.0f;
         float parentGY = m_parent ? m_parent->getGlobalY() : 0.0f;
 
-        // 直接調用你原本寫好的 getLocalX() / getLocalY()，百分比計算完全相容
+        // 直接調用 getLocalX() / getLocalY()，百分比計算完全相容
         m_cachedGlobalX = getLocalX() + parentGX;
         m_cachedGlobalY = getLocalY() + parentGY;
 
