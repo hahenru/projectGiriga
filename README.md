@@ -74,4 +74,21 @@ make
 
 對，就這麼簡單，我做了點判斷，現在他會看你的電腦是Windows嗎?但我沒考慮過都不是的部分。還請見諒。
 
+## 系統依賴與軟體包需求
 
+本專案採用 **C++23** 標準開發，建置前請確保系統環境已安裝相應的編譯器工具鏈與開發套件（Header / Development Libraries）。
+
+### 依賴組件清單
+
+| 組件名稱 | 建議版本 | 說明 | 鏈結參數 |
+| :--- | :--- | :--- | :--- |
+| **GCC / G++** | 13+ (支援 C++23) | 核心編譯工具鏈 | `-std=c++23` |
+| **OpenGL** | 4.6 Core Profile | 核心圖形渲染 API | `-lGL` / `-lopengl32` |
+| **GLFW** | 3.5.1 | 視窗建立、輸入事件監聽與 Context 管理 | `-lglfw` / `-lglfw3` |
+| **FreeType 2** | 2.15.0 | 向量字型載入與動態點陣圖烘焙 | `pkg-config --libs freetype2` / `-lfreetype` |
+| **Lua** | 5.4 | 腳本引擎與 In-Game REPL 執行環境 | `-llua` |
+| **ALSA** *(Linux 專用)* | 最新版 | 底層音訊後端支援 | `-lasound` |
+| **miniaudio** | 0.11.26 | 單一標頭檔音訊引擎（已內建實作包裝於專案中） | 需放置於 include 路徑 |
+| **GLAD** | 4.6 Core | OpenGL Function Loader | 原始碼已內建於 `src/glad.c` |
+
+以上依賴，除了glad以外，全部建議預編譯好，放在系統資料夾等待連結。
