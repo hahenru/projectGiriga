@@ -9,16 +9,9 @@ class AudioSystem;
 
 class LuaScene : public Scene {
 public:
-	LuaScene(SceneManager& manager,
-             EventBus& bus,
-             ResourceManager& resources,
-             LoggerSystem& logger,
-             AudioSystem& audio, // ★ 補上
-             ScriptEngine& scriptEngine,
-             std::string scriptResourceName)
-    : Scene(manager, bus, resources, logger, audio), // ★ 傳給基底
-      m_scriptEngine(scriptEngine),
-      m_scriptResourceName(std::move(scriptResourceName)) {}
+    LuaScene(SceneManager& manager, EngineContext& ctx, std::string scriptResourceName)
+        : Scene(manager, ctx),
+        m_scriptResourceName(std::move(scriptResourceName)) {}
 
     ~LuaScene() override = default;
 
@@ -30,7 +23,6 @@ public:
     std::unique_ptr<UIContainer> createUI() override;
 
 private:
-    ScriptEngine& m_scriptEngine;
     std::string m_scriptResourceName;
     std::unique_ptr<UIContainer> m_luaUI;
 };

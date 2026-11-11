@@ -1,9 +1,4 @@
 #include <Scene/SceneManager.h>
-#include <Audio/AudioSystem.h>
-
-SceneManager::SceneManager(EventBus& bus, ResourceManager& resources, LoggerSystem& logger, AudioSystem& audio)
-    : m_bus(bus), m_resources(resources), m_logger(logger), m_audio(audio) {
-}
 
 SceneManager::~SceneManager() {
     if (m_currentScene) {
@@ -14,7 +9,6 @@ SceneManager::~SceneManager() {
 
 void SceneManager::update(float dt) {
     applyPendingScene();
-
     if (m_currentScene) {
         m_currentScene->update(dt);
     }

@@ -73,7 +73,7 @@ SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
       src/UIRenderer.cpp src/UIManager.cpp src/FontResource.cpp \
       src/AudioResource.cpp src/miniaudio_impl.cpp src/AudioSystem.cpp \
       src/LuaScene.cpp src/UIPanel.cpp src/UIHorizontalLayout.cpp \
-      src/UISettingsMenu.cpp
+      src/UISettingsMenu.cpp src/EngineContext.cpp
 
 # Linux / 交叉編譯目標檔路徑
 OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
