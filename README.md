@@ -86,7 +86,7 @@ make
 | **OpenGL** | 4.6 Core Profile | 核心圖形渲染 API | `-lGL` / `-lopengl32` |
 | **GLFW** | 3.5.1 | 視窗建立、輸入事件監聽與 Context 管理 | `-lglfw` / `-lglfw3` |
 | **FreeType 2** | 2.15.0 | 向量字型載入與動態點陣圖烘焙 | `pkg-config --libs freetype2` / `-lfreetype` |
-| **Lua** | 5.4 | 腳本引擎與 In-Game REPL 執行環境 | `-llua` |
+| **Lua** | 5.5.1 | 腳本引擎與 In-Game REPL 執行環境 | `-llua` |
 | **ALSA** *(Linux 專用)* | 最新版 | 底層音訊後端支援 | `-lasound` |
 | **miniaudio** | 0.11.26 | 單一標頭檔音訊引擎（已內建實作包裝於專案中） | 需放置於 include 路徑 |
 | **GLAD** | 4.6 Core | OpenGL Function Loader | 原始碼已內建於 `src/glad.c` |
