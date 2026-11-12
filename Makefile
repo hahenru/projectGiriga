@@ -24,12 +24,12 @@ COMMON_SRC = \
     src/ScriptEngine.cpp \
     src/ScriptBindings.cpp \
     src/ScriptResource.cpp \
-    src/ConsoleSystem.cpp
+    src/ConsoleSystem.cpp \
+	src/Girigara.cpp \
+	src/main.cpp
 
 # 2. 客戶端專屬 (Client)
 CLIENT_SRC = \
-    src/main.cpp \
-    src/Girigara.cpp \
     src/Client/ClientContext.cpp \
     src/Client/ClientResourceManager.cpp \
     src/glad.c \
@@ -55,17 +55,17 @@ CLIENT_SRC = \
     src/AudioSystem.cpp \
     src/UIPanel.cpp \
     src/UIHorizontalLayout.cpp \
-    src/UISettingsMenu.cpp
+    src/UISettingsMenu.cpp \
+	src/Client/ClientRuntime.cpp
 
-# 3. 伺服器專屬 (Server - 無頭純邏輯)
-# (等你補上 src/Server/ServerApp.cpp 與 src/Server/server_main.cpp 後取消註解即可)
 SERVER_SRC = \
     src/Server/ServerContext.cpp \
-    src/Server/ServerResourceManager.cpp
+    src/Server/ServerResourceManager.cpp \
+	src/Server/ServerRuntime.cpp
     # src/Server/ServerApp.cpp \
     # src/Server/server_main.cpp
 
-ALL_CLIENT_SRC = $(COMMON_SRC) $(CLIENT_SRC)
+ALL_CLIENT_SRC = $(COMMON_SRC) $(CLIENT_SRC) $(SERVER_SRC)
 ALL_SERVER_SRC = $(COMMON_SRC) $(SERVER_SRC)
 
 # ==========================================
@@ -81,6 +81,7 @@ LDFLAGS = -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet $(shell pkg-confi
 SERVER_LDFLAGS = -ldl -llua -lpthread -lm -lenet
 
 BUILD_DIR = build
+SERVER_BUILD_DIR = $(BUILD_DIR)/server
 ASSETS_DIR = assets
 TARGET = $(BUILD_DIR)/projectGIRIGARA
 SERVER_TARGET = $(BUILD_DIR)/projectGIRIGARA_server
@@ -124,6 +125,7 @@ WIN_NAT_LDFLAGS  = -mwindows -Wl,--subsystem,windows \
 WIN_NAT_SERVER_LDFLAGS = -llua -lpthread -lenet -lws2_32 -lwinmm
 
 WIN_NAT_BUILD_DIR = $(BUILD_DIR)/win64_native
+WIN_NAT_SERVER_BUILD_DIR = $(BUILD_DIR)/win64_native_server
 WIN_NAT_TARGET    = $(WIN_NAT_BUILD_DIR)/projectGIRIGARA.exe
 WIN_NAT_SERVER_TARGET = $(WIN_NAT_BUILD_DIR)/projectGIRIGARA_server.exe
 PACKAGE_WIN_NAT   = $(BUILD_DIR)/ProjectGirigara_win64_native.zip
@@ -134,7 +136,7 @@ PACKAGE_WIN_NAT   = $(BUILD_DIR)/ProjectGirigara_win64_native.zip
 OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
        $(patsubst src/%.c, $(BUILD_DIR)/%.o, $(filter %.c, $(ALL_CLIENT_SRC)))
 
-SERVER_OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
+SERVER_OBJS = $(patsubst src/%.cpp, $(SERVER_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
 
 WIN_OBJS = $(patsubst src/%.cpp, $(WIN_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
            $(patsubst src/%.c, $(WIN_BUILD_DIR)/%.o, $(filter %.c, $(ALL_CLIENT_SRC)))
@@ -142,7 +144,7 @@ WIN_OBJS = $(patsubst src/%.cpp, $(WIN_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_CLI
 WIN_NAT_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
                $(patsubst src/%.c, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.c, $(ALL_CLIENT_SRC)))
 
-WIN_NAT_SERVER_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
+WIN_NAT_SERVER_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_SERVER_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
 
 DEPS = $(OBJS:.o=.d) $(SERVER_OBJS:.o=.d) $(WIN_OBJS:.o=.d)
 
@@ -158,8 +160,14 @@ $(TARGET): $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
 server: $(SERVER_TARGET)
+
+$(SERVER_TARGET): $(SERVER_OBJS)
 	@mkdir -p $(dir $@)
 	$(CXX) $(SERVER_OBJS) -o $@ $(SERVER_LDFLAGS)
+
+$(SERVER_BUILD_DIR)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -DGIRIGARA_SERVER -c $< -o $@
 
 $(BUILD_DIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
@@ -218,9 +226,15 @@ $(WIN_NAT_TARGET): $(WIN_NAT_OBJS)
 	$(WIN_NAT_CXX) $(WIN_NAT_OBJS) -o $@ $(WIN_NAT_LDFLAGS)
 
 win64-native-server: $(WIN_NAT_SERVER_OBJS)
+	@if not exist "$(WIN_NAT_BUILD_DIR)" mkdir "$(WIN_NAT_BUILD_DIR)"
 	@echo [LD] 連結無頭伺服器 $(WIN_NAT_SERVER_TARGET) ...
 	$(WIN_NAT_CXX) $(WIN_NAT_SERVER_OBJS) -o $(WIN_NAT_SERVER_TARGET) $(WIN_NAT_SERVER_LDFLAGS)
 
+$(WIN_NAT_SERVER_BUILD_DIR)/%.o: src/%.cpp
+	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
+	@echo [CXX-SERVER] $<
+	$(WIN_NAT_CXX) $(WIN_NAT_CXXFLAGS) -DGIRIGARA_SERVER -c $< -o $@
+	
 $(WIN_NAT_BUILD_DIR)/%.o: src/%.cpp
 	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
 	@echo [CXX] $<

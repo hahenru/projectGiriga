@@ -6,13 +6,16 @@
 #include <cstdint>
 #include <functional>
 
+
+class LoggerSystem;
+
 class ENetNode {
 public:
     using OnConnectCallback    = std::function<void(uint32_t peerId)>;
     using OnDisconnectCallback = std::function<void(uint32_t peerId)>;
     using OnReceiveCallback    = std::function<void(uint32_t peerId, uint8_t channel, const uint8_t* data, size_t size)>;
 
-    ENetNode() = default;
+    explicit ENetNode(LoggerSystem& logger);
     ~ENetNode();
 
     ENetNode(const ENetNode&) = delete;
@@ -43,6 +46,7 @@ public:
 private:
     ENetHost* m_host{nullptr};
     std::vector<ENetPeer*> m_peers; // 簡單的索引表管理 Peer
+	LoggerSystem& m_logger;
 
     OnConnectCallback m_onConnect;
     OnDisconnectCallback m_onDisconnect;

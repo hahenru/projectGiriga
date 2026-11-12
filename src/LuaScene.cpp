@@ -6,11 +6,13 @@
 #include <UI/UIContainer.h>
 #include <Resource/ScriptResource.h>
 
+#ifndef GIRIGARA_SERVER
 std::unique_ptr<UIContainer> LuaScene::createUI() {
     auto uiRoot = std::make_unique<UIContainer>();
     // 若 Lua 腳本有註冊 UI 元件，後續可在這裡組裝
     return uiRoot;
 }
+#endif
 
 void LuaScene::onEnter() {
     try {

@@ -1,5 +1,9 @@
 #include <Network/ENetNode.h>
 #include <iostream>
+#include <System/LoggerSystem.h>
+
+ENetNode::ENetNode(LoggerSystem& logger)
+    : m_logger(logger) {}
 
 ENetNode::~ENetNode() {
     shutdown();

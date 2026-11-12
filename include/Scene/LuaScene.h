@@ -14,7 +14,9 @@ public:
     void onEnter() override;
     void onExit() override;
     void update(float dt) override;
+#ifndef GIRIGARA_SERVER
     std::unique_ptr<UIContainer> createUI() override;
+#endif
 
 private:
     std::string m_scriptResourceName;

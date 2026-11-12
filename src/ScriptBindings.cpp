@@ -1,4 +1,15 @@
 #include <Script/ScriptBindings.h>
+#include <Script/ScriptEngine.h>
+#include <Core/CoreContext.h>
+
+#warning "[TODO / Architecture] ScriptBindings.cpp 目前已暫時停用 UI 與 Audio 綁定！請盡快重構為分散式註冊機制（由各子系統透過 EventBus 或註冊器自行向 ScriptEngine 綁定）。"
+
+#if 0
+// =========================================================================
+// [已封存] 舊版高耦合 Lua 綁定實作（直接依賴 UIElement / AudioSystem）
+// =========================================================================
+
+#include <Script/ScriptBindings.h>
 #include <Audio/AudioSystem.h>
 #include <System/SettingsRegistry.h>
 #include <Script/LuaRef.h>
@@ -334,4 +345,15 @@ namespace ScriptBindings {
         lua_register(L, "Audio_StopBGM", lua_Audio_StopBGM);
         lua_register(L, "Audio_PlaySFX", lua_Audio_PlaySFX);
     }
+}
+
+#endif
+
+// 保留對外註冊入口空殼，確保雙端連結不會出現 undefined reference
+void ScriptBindings::registerAll(lua_State* L, LoggerSystem& logger, AudioSystem& audio, SettingsRegistry& settings) {
+    (void)L;
+    (void)logger;
+    (void)audio;
+    (void)settings;
+    // TODO: 改由各子系統透過 EventBus 自行註冊 Lua 綁定
 }

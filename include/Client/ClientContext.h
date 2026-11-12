@@ -10,7 +10,6 @@
 #include <Network/ENetContext.h>
 #include <Network/ENetNode.h>
 
-
 class ClientContext : public CoreContext {
 public:
     ClientContext(int width, int height, const std::string& title);
