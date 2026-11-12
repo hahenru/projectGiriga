@@ -39,6 +39,7 @@ CLIENT_SRC = \
     src/UIElement.cpp \
     src/UIButton.cpp \
     src/UIText.cpp \
+    src/UIConsole.cpp \
     src/QuadMesh.cpp \
     src/UIWindow.cpp \
     src/KeyboardSystem.cpp \
