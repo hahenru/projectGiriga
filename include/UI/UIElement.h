@@ -40,7 +40,7 @@ public:
     virtual void update(float dt);
     void setScriptUpdate(LuaRef callback);
 
-    void setVisible(bool visible);
+    virtual void setVisible(bool visible);
     bool isVisible() const { return m_visible; }
 
     // 像素座標與大小設定

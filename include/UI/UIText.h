@@ -32,6 +32,8 @@ public:
     void render(UIRenderer& renderer) override;
     bool handleMouseMove(double x, double y) override;
     bool handleMouseButton(int button, int action, int mods, double x, double y) override;
+	void setAutoShrink(bool enabled);
+
 
 private:
     IResourceManager& m_resources;
@@ -42,6 +44,7 @@ private:
 
     unsigned int m_targetFontSize = 0;
     float m_scale = 1.0f;
+	bool m_autoShrink = true;
 
     void rebake();
     void updateMetrics();

@@ -49,8 +49,25 @@ public:
         updateContentPosition();
     }
 
-    float getContentHeight() const { return m_contentHeight; }
+    void setSize(float width, float height) {
+        UIContainer::setSize(width, height);
+        if (m_contentContainer) {
+            m_contentContainer->setSize(width, std::max(height, m_contentHeight));
+        }
+        clampScroll();
+        updateContentPosition();
+    }
 
+    void setContentHeight(float height) {
+        m_contentHeight = std::max(0.0f, height);
+        if (m_contentContainer) {
+            m_contentContainer->setSize(getWidth(), m_contentHeight);
+        }
+        clampScroll();
+        updateContentPosition();
+    }
+
+    float getScrollY() const { return m_scrollY; }
 private:
     void clampScroll() {
         float maxScroll = std::max(0.0f, m_contentHeight - getHeight());

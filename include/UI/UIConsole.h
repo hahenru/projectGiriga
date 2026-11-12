@@ -13,6 +13,7 @@
 #include <Shader/Shader.h>
 #include <vector>
 #include <cstddef>
+#include <limits>
 
 class UIConsole : public UIContainer {
 public:
@@ -36,11 +37,15 @@ public:
     void render(UIRenderer& renderer) override;
 
     UIInputField* getInputField() { return m_inputField; }
+	void setVisible(bool visible) override;
 
 private:
+    void initItemPool();
     void bindEvents();
-    void appendNewLogs();
-    void updateFontSizeInPlace();
+    void syncVirtualViewport();
+
+    static constexpr std::size_t kPoolCapacity = 150;
+    static constexpr std::size_t kInvalidIndex = std::numeric_limits<std::size_t>::max();
 
     EventBus& m_eventBus;
     ConsoleSystem& m_consoleSystem;
@@ -52,9 +57,16 @@ private:
     UIInputField* m_inputField{nullptr};
     UIText* m_inputPrompt{nullptr};
 
-    // 直接快取每行 UIText 指標，改字體大小時原地修改，完全不重建物件
-    std::vector<UIText*> m_logItems;
-    std::size_t m_syncedLogCount{0};
+    // 固定大小物件池：永遠只養 kPoolCapacity 個 UIText
+    std::vector<UIText*> m_itemPool;
+    std::vector<std::size_t> m_poolBoundIndex;
+    std::size_t m_lastLogCount{0};
+	
+	void rebuildWrappedLines();
+    void appendWrappedLog(const std::string& utf8Log);
+
+    std::vector<std::u32string> m_wrappedLines; // 折行後的視覺行清單
+    std::size_t m_syncedRawLogCount{0};
 
     float m_elapsedTime{0.0f};
     unsigned int m_fontSize{16};

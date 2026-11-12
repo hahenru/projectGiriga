@@ -42,7 +42,9 @@ void UIText::setColor(float r, float g, float b, float a) {
     m_color[3] = a;
 }
 
+
 void UIText::updateMetrics() {
+	
     if (!m_texture) {
         m_width = 0.0f;
         m_height = 0.0f;
@@ -61,7 +63,7 @@ void UIText::updateMetrics() {
     float baseW = static_cast<float>(m_texture->getWidth()) * m_scale;
     float baseH = static_cast<float>(m_texture->getHeight()) * m_scale;
 
-    if (m_parent && m_parent->getWidth() > 0.0f && m_parent->getHeight() > 0.0f) {
+    if (m_autoShrink && m_parent && m_parent->getWidth() > 0.0f && m_parent->getHeight() > 0.0f) {
         float maxAvailableW = m_parent->getWidth();
         float maxAvailableH = m_parent->getHeight();
 
@@ -104,6 +106,12 @@ void UIText::render(UIRenderer& renderer) {
         m_texture->getID(),
         m_color
     );
+}
+void UIText::setAutoShrink(bool enabled) {
+    if (m_autoShrink != enabled) {
+        m_autoShrink = enabled;
+        updateMetrics();
+    }
 }
 
 bool UIText::handleMouseMove(double, double) { return false; }

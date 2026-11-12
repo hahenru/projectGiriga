@@ -28,10 +28,11 @@ UIConsole::UIConsole(float x, float y, float width, float height,
 
     m_inputField->setOnSubmit([this](const std::string& cmd) {
         m_consoleSystem.executeCommand(cmd);
-        appendNewLogs();
         m_scrollView->scrollToBottom();
+        syncVirtualViewport();
     });
 
+    initItemPool();
     layoutChildren(width, height);
     bindEvents();
 }
@@ -42,6 +43,78 @@ UIConsole::UIConsole(float x, float y, float width, float height,
                      IResourceManager& resourceManager)
     : UIConsole(x, y, width, height, eventBus, consoleSystem, logger, resourceManager,
                 resourceManager.get<Shader>("ConsoleBackground")) {}
+
+void UIConsole::initItemPool() {
+    m_itemPool.reserve(kPoolCapacity);
+    m_poolBoundIndex.assign(kPoolCapacity, kInvalidIndex);
+
+    for (std::size_t i = 0; i < kPoolCapacity; ++i) {
+        auto* label = m_scrollView->emplaceItem<UIText>(
+            0.0f, 0.0f, m_resources, U"", m_fontSize
+        );
+        label->setColor(0.9f, 0.9f, 0.9f, 1.0f);
+        label->setAutoShrink(false); // ★ 關閉自動縮小，維持原始字級
+        label->setVisible(false);
+        m_itemPool.push_back(label);
+    }
+}
+
+void UIConsole::appendWrappedLog(const std::string& utf8Log) {
+    std::u32string u32 = EncodingUtils::utf8ToUtf32(utf8Log);
+    if (u32.empty()) {
+        m_wrappedLines.emplace_back(U"");
+        return;
+    }
+
+    // 預留右側 16px 安全邊距
+    const float maxLineWidth = std::max(60.0f, m_scrollView->getWidth() - 16.0f);
+    const float halfWidth = static_cast<float>(m_fontSize) * 0.55f;
+    const float fullWidth = static_cast<float>(m_fontSize) * 1.02f;
+
+    std::u32string currentLine;
+    float currentWidth = 0.0f;
+
+    for (char32_t ch : u32) {
+        if (ch == U'\r') continue;
+        if (ch == U'\n') {
+            m_wrappedLines.push_back(std::move(currentLine));
+            currentLine.clear();
+            currentWidth = 0.0f;
+            continue;
+        }
+
+        float charW = (ch < 0x80) ? halfWidth : fullWidth;
+        if (!currentLine.empty() && currentWidth + charW > maxLineWidth) {
+            m_wrappedLines.push_back(std::move(currentLine));
+            currentLine.clear();
+            currentWidth = 0.0f;
+        }
+
+        currentLine.push_back(ch);
+        currentWidth += charW;
+    }
+
+    if (!currentLine.empty()) {
+        m_wrappedLines.push_back(std::move(currentLine));
+    }
+}
+
+void UIConsole::rebuildWrappedLines() {
+    const auto& logs = m_logger.getLogs();
+    m_wrappedLines.clear();
+    m_wrappedLines.reserve(logs.size());
+
+    for (const auto& log : logs) {
+        appendWrappedLog(log);
+    }
+
+    m_syncedRawLogCount = logs.size();
+    std::fill(m_poolBoundIndex.begin(), m_poolBoundIndex.end(), kInvalidIndex);
+
+    const float lineH = static_cast<float>(m_fontSize) * 1.35f;
+    m_scrollView->setContentHeight(static_cast<float>(m_wrappedLines.size()) * lineH);
+    m_scrollView->scrollToBottom();
+}
 
 void UIConsole::setSize(float width, float height) {
     UIContainer::setSize(width, height);
@@ -66,17 +139,25 @@ void UIConsole::layoutChildren(float width, float height) {
         m_inputField->setPosition(padding + promptW, height - inputH - padding * 0.5f);
         m_inputField->setSize(width - padding * 2.0f - promptW, inputH);
     }
+
+    syncVirtualViewport();
 }
 
 void UIConsole::update(float dt) {
     UIContainer::update(dt);
-    if (isVisible()) {
-        m_elapsedTime += dt;
-    }
+    if (!isVisible()) return;
+
+    m_elapsedTime += dt;
+
     if (m_logger.isDirty()) {
-        appendNewLogs();
         m_logger.clearDirty();
+        const auto& logs = m_logger.getLogs();
+        const float lineH = static_cast<float>(m_fontSize) * 1.35f;
+        m_scrollView->setContentHeight(static_cast<float>(logs.size()) * lineH);
+        m_scrollView->scrollToBottom();
     }
+
+    syncVirtualViewport();
 }
 
 void UIConsole::render(UIRenderer& renderer) {
@@ -122,10 +203,16 @@ void UIConsole::bindEvents() {
 
             if (static_cast<unsigned int>(newSize) != m_fontSize) {
                 m_fontSize = static_cast<unsigned int>(newSize);
-                updateFontSizeInPlace(); // ★ 原地更新，完全不限制滾輪次數
+                const float lineH = static_cast<float>(m_fontSize) * 1.35f;
+                m_scrollView->setContentHeight(
+                    static_cast<float>(m_logger.getLogs().size()) * lineH
+                );
+                m_scrollView->scrollToBottom();
+                syncVirtualViewport();
             }
         } else {
             m_scrollView->scroll(static_cast<float>(-e.yoffset * 24.0f));
+            syncVirtualViewport();
         }
     });
 
@@ -138,47 +225,55 @@ void UIConsole::bindEvents() {
     });
 }
 
-void UIConsole::appendNewLogs() {
+void UIConsole::syncVirtualViewport() {
+    if (!m_scrollView) return;
+
     const auto& logs = m_logger.getLogs();
-
-    // 若 Logger 曾被清空或重置，才重新對齊
-    if (logs.size() < m_syncedLogCount) {
-        m_scrollView->clearItems();
-        m_logItems.clear();
-        m_syncedLogCount = 0;
-    }
-
-    if (m_syncedLogCount == logs.size()) return;
-
     const float lineH = static_cast<float>(m_fontSize) * 1.35f;
-    float curY = static_cast<float>(m_logItems.size()) * lineH;
 
-    // ★ 只針對新增的區段建立 UIText，舊的完全不動
-    for (std::size_t i = m_syncedLogCount; i < logs.size(); ++i) {
-        auto* label = m_scrollView->emplaceItem<UIText>(
-            0.0f, curY, m_resources, EncodingUtils::utf8ToUtf32(logs[i]), m_fontSize
-        );
-        label->setColor(0.9f, 0.9f, 0.9f, 1.0f);
-        m_logItems.push_back(label);
-        curY += lineH;
+    // 若 Log 數量因循環緩衝發生覆蓋（達 65535 上限後舊訊息被擠掉），清空快取索引強制刷新文字
+    if (logs.size() != m_lastLogCount) {
+        std::fill(m_poolBoundIndex.begin(), m_poolBoundIndex.end(), kInvalidIndex);
+        m_lastLogCount = logs.size();
     }
 
-    m_syncedLogCount = logs.size();
-    m_scrollView->fitContentHeight();
-    m_scrollView->scrollToBottom();
+    const float scrollY = std::max(0.0f, m_scrollView->getScrollY());
+    const float viewH = m_scrollView->getHeight();
+
+    const std::size_t firstIdx = static_cast<std::size_t>(scrollY / lineH);
+    const std::size_t visibleCount = std::min(
+        kPoolCapacity,
+        static_cast<std::size_t>(viewH / lineH) + 2
+    );
+
+    for (std::size_t i = 0; i < kPoolCapacity; ++i) {
+        const std::size_t logIdx = firstIdx + i;
+        UIText* label = m_itemPool[i];
+
+        if (i < visibleCount && logIdx < logs.size()) {
+            label->setVisible(true);
+            label->setFontSize(m_fontSize);
+            label->setPosition(0.0f, static_cast<float>(logIdx) * lineH);
+
+            if (m_poolBoundIndex[i] != logIdx) {
+                label->setText(EncodingUtils::utf8ToUtf32(logs[logIdx]));
+                m_poolBoundIndex[i] = logIdx;
+            }
+        } else {
+            label->setVisible(false);
+        }
+    }
 }
 
-void UIConsole::updateFontSizeInPlace() {
-    const float lineH = static_cast<float>(m_fontSize) * 1.35f;
-    float curY = 0.0f;
-
-    // ★ 直接改現有 UIText 的字體大小與 Y 座標，零記憶體配置、零字串轉碼
-    for (auto* label : m_logItems) {
-        label->setFontSize(m_fontSize);
-        label->setPosition(0.0f, curY);
-        curY += lineH;
+void UIConsole::setVisible(bool visible) {
+    UIContainer::setVisible(visible);
+    if (visible) {
+        std::fill(m_poolBoundIndex.begin(), m_poolBoundIndex.end(), kInvalidIndex);
+        const float lineH = static_cast<float>(m_fontSize) * 1.35f;
+        m_scrollView->setContentHeight(
+            static_cast<float>(m_logger.getLogs().size()) * lineH
+        );
+        m_scrollView->scrollToBottom();
+        syncVirtualViewport();
     }
-
-    m_scrollView->fitContentHeight();
-    m_scrollView->scrollToBottom();
 }
