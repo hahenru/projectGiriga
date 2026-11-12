@@ -3,7 +3,8 @@
 #include <Scene/MainMenuScene.h>
 #include <UI/UIButton.h>
 #include <UI/UIText.h>
-#include <Resource/ResourceManager.h>
+#include <Core/CoreContext.h>
+#include <Resource/IResourceManager.h>
 #include <iostream>
 
 std::unique_ptr<UIContainer> GameScene::createUI() {

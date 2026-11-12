@@ -3,25 +3,27 @@
 
 #include <string>
 #include <memory>
+#include <Resource/IResource.h>
 #include <Font/FontLoader.h>
 
-class FontResource {
+class FontResource : public IResource{
 public:
     FontResource(std::string resolvedPath, unsigned int fontSize);
-    ~FontResource() = default;
+    ~FontResource()override = default;
 
     FontResource(const FontResource&) = delete;
     FontResource& operator=(const FontResource&) = delete;
     FontResource(FontResource&&) noexcept = default;
     FontResource& operator=(FontResource&&) noexcept = default;
 
-    const std::string& getPath() const { return m_path; }
+    const std::string& getPath() const override{ return m_path; }
     unsigned int getFontSize() const { return m_fontSize; }
 
     FontLoader& getFontLoader() { return *m_fontLoader; }
     const FontLoader& getFontLoader() const { return *m_fontLoader; }
 
-    bool reload(unsigned int newFontSize = 0);
+    bool reload() override { return reload(0); }
+    bool reload(unsigned int newFontSize);
 
 private:
     std::string m_path;

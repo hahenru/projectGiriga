@@ -5,33 +5,9 @@
 #include <stdexcept>
 #include <utility>
 
-// 從檔案路徑建構：讀取檔案字串後委託給既有管線
-Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
-    std::string vertexCode = readFile(vertexPath);
-    std::string fragmentCode = readFile(fragmentPath);
-
-    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexCode.c_str());
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentCode.c_str());
-
-    m_programID = glCreateProgram();
-    glAttachShader(m_programID, vertexShader);
-    glAttachShader(m_programID, fragmentShader);
-    glLinkProgram(m_programID);
-
-    // 鏈結檢查
-    GLint success;
-    glGetProgramiv(m_programID, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(m_programID, 512, nullptr, infoLog);
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
-        glDeleteProgram(m_programID);
-        throw std::runtime_error(std::string("Shader Program Link Failed:\n") + infoLog);
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath)
+    : m_vertexPath(vertexPath), m_fragmentPath(fragmentPath) {
+    m_programID = buildProgram(m_vertexPath, m_fragmentPath);
 }
 
 Shader::~Shader() {
@@ -41,7 +17,10 @@ Shader::~Shader() {
     }
 }
 
-Shader::Shader(Shader&& other) noexcept : m_programID(other.m_programID) {
+Shader::Shader(Shader&& other) noexcept
+    : m_programID(other.m_programID),
+      m_vertexPath(std::move(other.m_vertexPath)),
+      m_fragmentPath(std::move(other.m_fragmentPath)) {
     other.m_programID = 0;
 }
 
@@ -51,9 +30,54 @@ Shader& Shader::operator=(Shader&& other) noexcept {
             glDeleteProgram(m_programID);
         }
         m_programID = other.m_programID;
+        m_vertexPath = std::move(other.m_vertexPath);
+        m_fragmentPath = std::move(other.m_fragmentPath);
         other.m_programID = 0;
     }
     return *this;
+}
+
+bool Shader::reload() {
+    if (m_vertexPath.empty() || m_fragmentPath.empty()) return false;
+    try {
+        GLuint newProgram = buildProgram(m_vertexPath, m_fragmentPath);
+        if (m_programID != 0) {
+            glDeleteProgram(m_programID);
+        }
+        m_programID = newProgram;
+        return true;
+    } catch (...) {
+        // 編譯失敗時保留原本正常的 m_programID，避免畫面崩潰
+        return false;
+    }
+}
+
+GLuint Shader::buildProgram(const std::string& vertexPath, const std::string& fragmentPath) {
+    std::string vertexCode = readFile(vertexPath);
+    std::string fragmentCode = readFile(fragmentPath);
+
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexCode.c_str());
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentCode.c_str());
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glLinkProgram(program);
+
+    GLint success;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+        glDeleteProgram(program);
+        throw std::runtime_error(std::string("Shader Program Link Failed:\n") + infoLog);
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    return program;
 }
 
 void Shader::use() const {

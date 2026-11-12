@@ -2,21 +2,21 @@
 #define GIRIGARA_RESOURCE_SCRIPT_RESOURCE_H
 
 #include <string>
+#include <Resource/IResource.h>
 
-class ScriptResource {
+class ScriptResource : public IResource{
 public:
     ScriptResource(std::string resolvedPath, std::string sourceCode)
     : m_path(std::move(resolvedPath)), m_code(std::move(sourceCode)) {}
 
-    const std::string& getPath() const { return m_path; }
+    const std::string& getPath() const override { return m_path; }
     const std::string& getCode() const { return m_code; }
 
-    // 支援重新載入（供熱重載使用）
-    bool reload();
+    bool reload() override;
 
 private:
     std::string m_path;
     std::string m_code;
 };
 
-#endif // GIRIGARA_RESOURCE_SCRIPT_RESOURCE_H
+#endif// GIRIGARA_RESOURCE_SCRIPT_RESOURCE_H

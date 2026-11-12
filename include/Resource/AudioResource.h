@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <Resource/IResource.h>
 
 enum class AudioFormat {
     Unknown,
@@ -12,17 +13,17 @@ enum class AudioFormat {
     MP3
 };
 
-class AudioResource {
+class AudioResource : public IResource{
 public:
     AudioResource(std::string resolvedPath);
-    ~AudioResource() = default;
+    ~AudioResource() override = default;
 
     AudioResource(const AudioResource&) = delete;
     AudioResource& operator=(const AudioResource&) = delete;
     AudioResource(AudioResource&&) noexcept = default;
     AudioResource& operator=(AudioResource&&) noexcept = default;
 
-    const std::string& getPath() const { return m_path; }
+    const std::string& getPath() const override { return m_path; }
     const std::vector<uint8_t>& getRawData() const { return m_data; }
     
     uint32_t getSampleRate() const { return m_sampleRate; }
@@ -31,7 +32,7 @@ public:
     AudioFormat getFormat() const { return m_format; }
     bool isLoaded() const { return m_isLoaded; }
 
-    bool reload();
+    bool reload() override;
 
 private:
     bool loadFromFile();

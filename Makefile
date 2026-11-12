@@ -12,17 +12,78 @@ endif
 .DEFAULT_GOAL := $(DEFAULT_GOAL)
 
 # ==========================================
+# 原始碼分類 (嚴格依據目錄結構分流)
+# ==========================================
+# 1. 雙端共用核心 (Common)
+COMMON_SRC = \
+    src/Core/CoreContext.cpp \
+    src/Network/ENetNode.cpp \
+	src/Scene.cpp \
+    src/SceneManager.cpp \
+    src/LuaScene.cpp \
+    src/ScriptEngine.cpp \
+    src/ScriptBindings.cpp \
+    src/ScriptResource.cpp \
+    src/ConsoleSystem.cpp
+
+# 2. 客戶端專屬 (Client)
+CLIENT_SRC = \
+    src/main.cpp \
+    src/Girigara.cpp \
+    src/Client/ClientContext.cpp \
+    src/Client/ClientResourceManager.cpp \
+    src/glad.c \
+    src/Shader.cpp \
+    src/WindowManager.cpp \
+    src/UIContainer.cpp \
+    src/UIElement.cpp \
+    src/UIButton.cpp \
+    src/UIText.cpp \
+    src/QuadMesh.cpp \
+    src/UIWindow.cpp \
+    src/KeyboardSystem.cpp \
+    src/MainMenuScene.cpp \
+    src/GameScene.cpp \
+    src/FontLoader.cpp \
+    src/UIVerticalLayout.cpp \
+    src/UISlantedLayout.cpp \
+    src/UIRenderer.cpp \
+    src/UIManager.cpp \
+    src/FontResource.cpp \
+    src/AudioResource.cpp \
+    src/miniaudio_impl.cpp \
+    src/AudioSystem.cpp \
+    src/UIPanel.cpp \
+    src/UIHorizontalLayout.cpp \
+    src/UISettingsMenu.cpp
+
+# 3. 伺服器專屬 (Server - 無頭純邏輯)
+# (等你補上 src/Server/ServerApp.cpp 與 src/Server/server_main.cpp 後取消註解即可)
+SERVER_SRC = \
+    src/Server/ServerContext.cpp \
+    src/Server/ServerResourceManager.cpp
+    # src/Server/ServerApp.cpp \
+    # src/Server/server_main.cpp
+
+ALL_CLIENT_SRC = $(COMMON_SRC) $(CLIENT_SRC)
+ALL_SERVER_SRC = $(COMMON_SRC) $(SERVER_SRC)
+
+# ==========================================
 # 原生 Linux 工具鏈與旗標
 # ==========================================
 CXX = g++
 CC = gcc
 CXXFLAGS = -g -std=c++23 -MMD -MP -fPIE -I./include $(shell pkg-config --cflags freetype2 2>/dev/null)
 CFLAGS = -g -MMD -MP -fPIE -I./include
-LDFLAGS = -lglfw -lGL -ldl -llua -lpthread -lasound -lm $(shell pkg-config --libs freetype2 2>/dev/null)
+
+# Linux 連結參數 (加入 -lenet)
+LDFLAGS = -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet $(shell pkg-config --libs freetype2 2>/dev/null)
+SERVER_LDFLAGS = -ldl -llua -lpthread -lm -lenet
 
 BUILD_DIR = build
 ASSETS_DIR = assets
 TARGET = $(BUILD_DIR)/projectGIRIGARA
+SERVER_TARGET = $(BUILD_DIR)/projectGIRIGARA_server
 PACKAGE_LINUX = $(BUILD_DIR)/ProjectGirigara_linux.tar.gz
 
 # ==========================================
@@ -32,14 +93,15 @@ WIN_CXX = x86_64-w64-mingw32-g++
 WIN_CC  = x86_64-w64-mingw32-gcc
 WIN_PREFIX = /usr/x86_64-w64-mingw32/sys-root/mingw
 
-# 由 MinGW sys-root 接管 lua.h、freetype2 與 liblua.a
 WIN_CXXFLAGS = -O2 -std=c++23 -MMD -MP -I./include -I$(WIN_PREFIX)/include/freetype2
 WIN_CFLAGS   = -O2 -MMD -MP -I./include
 
+# Windows 交叉編譯連結參數 (加入 -lenet -lws2_32)
 WIN_LDFLAGS  = -L$(WIN_PREFIX)/lib \
                -lglfw3 -llua -lopengl32 -lole32 \
                -lfreetype -lpng -lz -lbz2 \
                -lgdi32 -limm32 -lwinmm -lpthread \
+               -lenet -lws2_32 \
                -static-libgcc -static-libstdc++ -static
 
 WIN_BUILD_DIR = $(BUILD_DIR)/win64
@@ -53,68 +115,64 @@ WIN_NAT_CXX = g++
 WIN_NAT_CC  = gcc
 WIN_NAT_CXXFLAGS = -g -std=c++23 -I./include
 WIN_NAT_CFLAGS   = -g -I./include
+
+# Windows 原生連結參數 (加入 -lenet -lws2_32，注意順序 -lenet 在前)
 WIN_NAT_LDFLAGS  = -mwindows -Wl,--subsystem,windows \
-    -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread -lole32 -lwinmm
+    -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread -lole32 \
+    -lenet -lws2_32 -lwinmm
+
+WIN_NAT_SERVER_LDFLAGS = -llua -lpthread -lenet -lws2_32 -lwinmm
 
 WIN_NAT_BUILD_DIR = $(BUILD_DIR)/win64_native
 WIN_NAT_TARGET    = $(WIN_NAT_BUILD_DIR)/projectGIRIGARA.exe
+WIN_NAT_SERVER_TARGET = $(WIN_NAT_BUILD_DIR)/projectGIRIGARA_server.exe
 PACKAGE_WIN_NAT   = $(BUILD_DIR)/ProjectGirigara_win64_native.zip
 
 # ==========================================
-# 專案主程式原始碼
+# 目標檔路徑映射
 # ==========================================
-SRC = src/main.cpp src/Girigara.cpp src/glad.c src/Shader.cpp \
-      src/WindowManager.cpp src/ResourceManager.cpp src/UIContainer.cpp \
-      src/UIElement.cpp src/UIButton.cpp src/UIText.cpp src/QuadMesh.cpp \
-      src/UIWindow.cpp src/KeyboardSystem.cpp src/SceneManager.cpp \
-      src/MainMenuScene.cpp src/GameScene.cpp src/ScriptEngine.cpp \
-      src/ScriptBindings.cpp src/ScriptResource.cpp src/ConsoleSystem.cpp \
-      src/FontLoader.cpp src/UIVerticalLayout.cpp src/UISlantedLayout.cpp \
-      src/UIRenderer.cpp src/UIManager.cpp src/FontResource.cpp \
-      src/AudioResource.cpp src/miniaudio_impl.cpp src/AudioSystem.cpp \
-      src/LuaScene.cpp src/UIPanel.cpp src/UIHorizontalLayout.cpp \
-      src/UISettingsMenu.cpp src/EngineContext.cpp
+OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
+       $(patsubst src/%.c, $(BUILD_DIR)/%.o, $(filter %.c, $(ALL_CLIENT_SRC)))
 
-# Linux / 交叉編譯目標檔路徑
-OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
-       $(patsubst src/%.c, $(BUILD_DIR)/%.o, $(filter %.c, $(SRC)))
+SERVER_OBJS = $(patsubst src/%.cpp, $(BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
 
-WIN_OBJS = $(patsubst src/%.cpp, $(WIN_BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
-           $(patsubst src/%.c, $(WIN_BUILD_DIR)/%.o, $(filter %.c, $(SRC)))
+WIN_OBJS = $(patsubst src/%.cpp, $(WIN_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
+           $(patsubst src/%.c, $(WIN_BUILD_DIR)/%.o, $(filter %.c, $(ALL_CLIENT_SRC)))
 
-# Windows 原生編譯目標檔路徑
-WIN_NAT_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.cpp, $(SRC))) \
-               $(patsubst src/%.c, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.c, $(SRC)))
+WIN_NAT_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
+               $(patsubst src/%.c, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.c, $(ALL_CLIENT_SRC)))
 
-# 追蹤相依性 .d 檔案
-DEPS = $(OBJS:.o=.d) $(WIN_OBJS:.o=.d)
+WIN_NAT_SERVER_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_BUILD_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
 
-# Linux 預設總建置目標
-all: linux win64 rpm flatpak
+DEPS = $(OBJS:.o=.d) $(SERVER_OBJS:.o=.d) $(WIN_OBJS:.o=.d)
 
 # ==========================================
 # Linux 原生建置流程
 # ==========================================
+all: linux win64 flatpak
+
 linux: $(TARGET) copy_assets_linux package_linux
 
-$(TARGET): $(OBJS) | $(BUILD_DIR)
+$(TARGET): $(OBJS)
+	@mkdir -p $(dir $@)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
-$(BUILD_DIR)/%.o: src/%.cpp | $(BUILD_DIR)
+server: $(SERVER_TARGET)
+	@mkdir -p $(dir $@)
+	$(CXX) $(SERVER_OBJS) -o $@ $(SERVER_LDFLAGS)
+
+$(BUILD_DIR)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: src/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-copy_assets_linux: | $(BUILD_DIR)
+copy_assets_linux:
+	@mkdir -p $(BUILD_DIR)
 	@rm -rf $(BUILD_DIR)/$(ASSETS_DIR)
 	@cp -r $(ASSETS_DIR) $(BUILD_DIR)/
-
-clean_linux_objs:
-	@rm -f $(BUILD_DIR)/*.o $(BUILD_DIR)/*.d
 
 package_linux: $(TARGET) copy_assets_linux
 	@echo "==> 打包 Linux 發布包至 $(PACKAGE_LINUX) ..."
@@ -125,27 +183,24 @@ package_linux: $(TARGET) copy_assets_linux
 # ==========================================
 win64: $(WIN_TARGET) copy_assets_win package_win
 
-$(WIN_TARGET): $(WIN_OBJS) | $(WIN_BUILD_DIR)
+$(WIN_TARGET): $(WIN_OBJS)
+	@mkdir -p $(dir $@)
 	@echo "==> 靜態鏈結 $(WIN_TARGET) ..."
 	$(WIN_CXX) $(WIN_OBJS) -o $@ $(WIN_LDFLAGS)
 
-$(WIN_BUILD_DIR)/%.o: src/%.cpp | $(WIN_BUILD_DIR)
+$(WIN_BUILD_DIR)/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
 	$(WIN_CXX) $(WIN_CXXFLAGS) -c $< -o $@
 
-$(WIN_BUILD_DIR)/%.o: src/%.c | $(WIN_BUILD_DIR)
+$(WIN_BUILD_DIR)/%.o: src/%.c
+	@mkdir -p $(dir $@)
 	$(WIN_CC) $(WIN_CFLAGS) -c $< -o $@
 
-$(WIN_BUILD_DIR):
-	mkdir -p $(WIN_BUILD_DIR)
-
-copy_assets_win: | $(WIN_BUILD_DIR)
+copy_assets_win:
+	@mkdir -p $(WIN_BUILD_DIR)
 	@echo "==> 複製 assets 至 Windows 目錄..."
 	@rm -rf $(WIN_BUILD_DIR)/$(ASSETS_DIR)
 	@cp -r $(ASSETS_DIR) $(WIN_BUILD_DIR)/
-
-clean_win_objs:
-	@echo "==> 清理 Windows 中間檔案 (*.o, *.d)..."
-	@rm -f $(WIN_BUILD_DIR)/*.o $(WIN_BUILD_DIR)/*.d
 
 package_win: $(WIN_TARGET) copy_assets_win
 	@echo "==> 壓縮 Windows 發布包至 $(PACKAGE_WIN)..."
@@ -158,29 +213,29 @@ package_win: $(WIN_TARGET) copy_assets_win
 # ==========================================
 win64-native: package_win_nat
 
-$(WIN_NAT_TARGET): $(WIN_NAT_OBJS) | $(WIN_NAT_BUILD_DIR)
+$(WIN_NAT_TARGET): $(WIN_NAT_OBJS)
 	@echo [LD] 連結 $@ ...
 	$(WIN_NAT_CXX) $(WIN_NAT_OBJS) -o $@ $(WIN_NAT_LDFLAGS)
 
-$(WIN_NAT_BUILD_DIR)/%.o: src/%.cpp | $(WIN_NAT_BUILD_DIR)
+win64-native-server: $(WIN_NAT_SERVER_OBJS)
+	@echo [LD] 連結無頭伺服器 $(WIN_NAT_SERVER_TARGET) ...
+	$(WIN_NAT_CXX) $(WIN_NAT_SERVER_OBJS) -o $(WIN_NAT_SERVER_TARGET) $(WIN_NAT_SERVER_LDFLAGS)
+
+$(WIN_NAT_BUILD_DIR)/%.o: src/%.cpp
+	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
 	@echo [CXX] $<
 	$(WIN_NAT_CXX) $(WIN_NAT_CXXFLAGS) -c $< -o $@
 
-$(WIN_NAT_BUILD_DIR)/%.o: src/%.c | $(WIN_NAT_BUILD_DIR)
+$(WIN_NAT_BUILD_DIR)/%.o: src/%.c
+	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
 	@echo [CC] $<
 	$(WIN_NAT_CC) $(WIN_NAT_CFLAGS) -c $< -o $@
 
-$(WIN_NAT_BUILD_DIR):
-	@if not exist "$@" mkdir "$@"
-
-copy_assets_win_nat: | $(WIN_NAT_BUILD_DIR)
+copy_assets_win_nat:
+	@if not exist "$(WIN_NAT_BUILD_DIR)" mkdir "$(WIN_NAT_BUILD_DIR)"
 	@echo [ASSETS] 複製 assets 資料夾...
 	@if exist "$(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)" rmdir /S /Q "$(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)"
 	@xcopy /E /I /Q /Y $(ASSETS_DIR) "$(WIN_NAT_BUILD_DIR)\$(ASSETS_DIR)" >nul
-
-clean_win_nat_objs:
-	@echo [CLEAN] 清理 Windows 原生中間暫存檔 (*.o)...
-	@if exist "$(WIN_NAT_BUILD_DIR)\*.o" del /Q "$(WIN_NAT_BUILD_DIR)\*.o"
 
 package_win_nat: $(WIN_NAT_TARGET) copy_assets_win_nat
 	@echo [PACKAGE] 打包 Windows 發布包至 $(PACKAGE_WIN_NAT) ...
@@ -188,12 +243,11 @@ package_win_nat: $(WIN_NAT_TARGET) copy_assets_win_nat
 	@cd build\win64_native && tar -a -c -f "..\ProjectGirigara_win64_native.zip" projectGIRIGARA.exe assets
 	@echo [OK] Windows 原生發布包打包完成！
 
-# 版本號與前綴
+# ==========================================
+# RPM / Flatpak 打包目標 (Linux 專用)
+# ==========================================
 VERSION = 0.1.5
 
-# ==========================================
-# RPM 打包目標 (Linux 專用)
-# ==========================================
 rpm:
 	@mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPECS
 	@git archive --format=tar.gz --prefix=ProjectGirigara-$(VERSION)/ -o ~/rpmbuild/SOURCES/ProjectGirigara-$(VERSION).tar.gz HEAD
@@ -206,14 +260,12 @@ FLATPAK_BUILD_DIR = build-flatpak
 FLATPAK_REPO = repo
 FLATPAK_BUNDLE = $(BUILD_DIR)/$(FLATPAK_ID).flatpak
 
-# ==========================================
-# Flatpak 打包目標 (Linux 專用)
-# ==========================================
 flatpak-install:
 	@echo "==> 使用 flatpak-builder 編譯並安裝到本地..."
 	flatpak-builder --user --install --force-clean $(FLATPAK_BUILD_DIR) $(FLATPAK_MANIFEST)
 
-flatpak: | $(BUILD_DIR)
+flatpak:
+	@mkdir -p $(BUILD_DIR)
 	@echo "==> 編譯 Flatpak 儲存庫..."
 	flatpak-builder --repo=$(FLATPAK_REPO) --force-clean $(FLATPAK_BUILD_DIR) $(FLATPAK_MANIFEST)
 	@echo "==> 匯出獨立安裝包至 $(FLATPAK_BUNDLE)..."
@@ -232,9 +284,11 @@ else
 	rm -rf $(BUILD_DIR) $(FLATPAK_BUILD_DIR) $(FLATPAK_REPO)
 endif
 
-# 自動載入相依性清單
 -include $(DEPS)
 
-.PHONY: all linux win64 win64-native copy_assets_linux clean_linux_objs package_linux \
-        copy_assets_win clean_win_objs package_win copy_assets_win_nat clean_win_nat_objs \
-        package_win_nat clean rpm flatpak flatpak-install
+tree:
+	tree . /f
+
+.PHONY: all linux server win64 win64-native win64-native-server \
+        copy_assets_linux package_linux copy_assets_win package_win \
+        copy_assets_win_nat package_win_nat clean rpm flatpak flatpak-install tree

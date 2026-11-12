@@ -6,7 +6,7 @@
 class UIRenderer;
 
 UIWindow::UIWindow(float x, float y, float width, float height,
-                   ResourceManager& resources, const std::u32string& title,
+                   IResourceManager& resources, const std::u32string& title,
                    unsigned int titleFontSize, std::string fontName)
 : UIElement(x, y, width, height) {
     m_container.setParent(this);

@@ -1,7 +1,10 @@
 #include <Scene/LuaScene.h>
-#include <Resource/ResourceManager.h>
+#include <Resource/IResourceManager.h>
 #include <System/LoggerSystem.h>
 #include <Script/ScriptEngine.h>
+#include <Scene/LuaScene.h>
+#include <UI/UIContainer.h>
+#include <Resource/ScriptResource.h>
 
 std::unique_ptr<UIContainer> LuaScene::createUI() {
     auto uiRoot = std::make_unique<UIContainer>();
@@ -11,7 +14,7 @@ std::unique_ptr<UIContainer> LuaScene::createUI() {
 
 void LuaScene::onEnter() {
     try {
-        const auto& script = m_ctx.resources->getScript(m_scriptResourceName);
+        const auto& script = m_ctx.resources->get<ScriptResource>(m_scriptResourceName);
         m_ctx.logger->info("[LuaScene] 載入腳本: " + script.getPath());
 
         if (m_ctx.scriptEngine->executeResource(script)) {

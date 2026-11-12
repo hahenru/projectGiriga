@@ -5,7 +5,9 @@
 #include <UI/UIText.h>
 #include <UI/UISlantedLayout.h>
 #include <Audio/AudioSystem.h>
-#include <Resource/ResourceManager.h>
+#include <Core/CoreContext.h>
+#include <Resource/IResourceManager.h>
+#include <Client/ClientContext.h>
 #include <iostream>
 
 std::unique_ptr<UIContainer> MainMenuScene::createUI() {
@@ -50,8 +52,9 @@ std::unique_ptr<UIContainer> MainMenuScene::createUI() {
 }
 
 void MainMenuScene::onEnter() {
-    // ★ m_audio 改成 m_ctx.audio->
-    m_ctx.audio->playBGM("./assets/Sounds/Deserted-Hell.wav", true);
+	if (auto* clientCtx = dynamic_cast<ClientContext*>(&m_ctx)) {
+		clientCtx->audio->playBGM("./assets/Sounds/Deserted-Hell.wav", true);
+	}
     std::cout << "[Scene] Entering MainMenuScene...\n";
 }
 

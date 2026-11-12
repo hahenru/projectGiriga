@@ -3,7 +3,7 @@
 #include <algorithm>
 
 UISettingsMenu::UISettingsMenu(float x, float y, float width, float height,
-                               ResourceManager& resources, EventBus& eventBus)
+                               IResourceManager& resources, EventBus& eventBus)
 : UIPanel(x, y, width, height),
 m_resources(resources),
 m_eventBus(eventBus) {

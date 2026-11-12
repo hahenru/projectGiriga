@@ -40,12 +40,14 @@
 不過到了那個時候，我得把 Engine 和 Runtime 徹底分開，這恐怕會很麻煩……所以就如上述，是**「有機會」**而非保證。
 
 以下是近期目標:
+一個正常的場景轉場
 加入sqlite的支援還有某種zip的解決方案，和一些額外的添加物，為了增添風味。
 圖片載入的功能，但不是libpng、libjpg，他不夠全能。
 glm或是其他數學庫
 
 以下是遠期目標:
 https和websocket支持。
+使用ENet+Asio+libcurl的組合。
 Engine, Runtime separate.
 
 ---
@@ -89,6 +91,7 @@ make
 | **GLFW** | 3.5.1 | 視窗建立、輸入事件監聽與 Context 管理 | `-lglfw` / `-lglfw3` |
 | **FreeType 2** | 2.15.0 | 向量字型載入與動態點陣圖烘焙 | `pkg-config --libs freetype2` / `-lfreetype` |
 | **Lua** | 5.5.1 | 腳本引擎與 In-Game REPL 執行環境 | `-llua` |
+| **ENet** | After 1.3.18 Commit 5a9c537 | 低延遲遊戲網路庫 | |
 | **ALSA** *(Linux 專用)* | 最新版 | 底層音訊後端支援 | `-lasound` |
 | **miniaudio** | 0.11.26 | 單一標頭檔音訊引擎（已內建實作包裝於專案中） | 需放置於 include 路徑 |
 | **GLAD** | 4.6 Core | OpenGL Function Loader | 原始碼已內建於 `src/glad.c` |
@@ -99,3 +102,7 @@ make
 ## 一點額外的教學
 
 我不確定你是不是第一次碰這種東西，由於依賴都不存放在專案資料夾，加上windows通常沒有包管理器，如果你是用gcc的話，你會需要在任意的地方建立一個資料夾，然後在系統變數裡面加上CPATH，並且指向你新建的那個資料夾，然後資料夾裡面新建一個include和lib，然後系統變數建立一個LIBRARY_PATH指向那個新的lib資料夾，當然，如果你早就知道了，可以忽略這一段。
+
+## 寫在最後
+
+我可能永遠不會支援MacOS，因為當我想買的時候他自己漲價到我手夠不到的高度。

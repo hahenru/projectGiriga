@@ -2,14 +2,15 @@
 #define SHADER_H
 
 #include <glad/glad.h>
+#include <Resource/IResource.h>
 #include <string>
 
-class Shader {
+class Shader : public IResource {
 public:
     // 從檔案路徑載入並編譯
     Shader(const std::string& vertexPath, const std::string& fragmentPath);
 
-    ~Shader();
+    ~Shader() override;
 
     // RAII：禁止拷貝，支援移動
     Shader(const Shader&) = delete;
@@ -17,6 +18,10 @@ public:
 
     Shader(Shader&& other) noexcept;
     Shader& operator=(Shader&& other) noexcept;
+
+    // IResource 介面實作
+    const std::string& getPath() const override { return m_vertexPath; }
+    bool reload() override;
 
     void use() const;
 
@@ -34,7 +39,10 @@ public:
 
 private:
     GLuint m_programID = 0;
+    std::string m_vertexPath;
+    std::string m_fragmentPath;
 
+    GLuint buildProgram(const std::string& vertexPath, const std::string& fragmentPath);
     std::string readFile(const std::string& filePath);
     GLuint compileShader(GLenum type, const char* source);
 };

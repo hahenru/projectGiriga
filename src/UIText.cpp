@@ -1,8 +1,9 @@
 #include <UI/UIText.h>
 #include <Renderer/UIRenderer.h>
+#include <Resource/FontResource.h>
 #include <algorithm>
 
-UIText::UIText(float x, float y, ResourceManager& resources,
+UIText::UIText(float x, float y, IResourceManager& resources,
                const std::u32string& text, unsigned int fontSize,
                std::string fontName)
     : UIElement(x, y, 0.0f, 0.0f),
@@ -49,7 +50,7 @@ void UIText::updateMetrics() {
         return;
     }
 
-    FontLoader& font = m_resources.getFontLoader(m_fontName);
+    FontLoader& font = m_resources.get<FontResource>(m_fontName).getFontLoader();
     unsigned int baseSize = font.getFontSize();
     if (m_targetFontSize > 0 && baseSize > 0) {
         m_scale = static_cast<float>(m_targetFontSize) / static_cast<float>(baseSize);
@@ -89,8 +90,7 @@ void UIText::rebake() {
         return;
     }
 
-    // ★ 直接跟 ResourceManager 要字型烘焙
-    FontLoader& font = m_resources.getFontLoader(m_fontName);
+    FontLoader& font = m_resources.get<FontResource>(m_fontName).getFontLoader();
     m_texture = std::make_unique<TextTexture>(font, m_text);
     updateMetrics();
 }

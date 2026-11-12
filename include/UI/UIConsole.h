@@ -9,7 +9,8 @@
 #include <System/ConsoleSystem.h>
 #include <Event/EventBus.h>
 #include <Renderer/UIRenderer.h>
-#include <Resource/ResourceManager.h>
+#include <Resource/IResourceManager.h> // ★ 切換為抽象介面
+#include <Shader/Shader.h>             // ★ UIConsole 屬於 Client 端渲染，引入 Shader 定義
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <string>
@@ -20,17 +21,14 @@ public:
     UIConsole(float x, float y, float width, float height,
               EventBus& eventBus,
               ConsoleSystem& consoleSystem, LoggerSystem& logger,
-              ResourceManager& resourceManager)
+              IResourceManager& resourceManager, // ★ 改為 IResourceManager&
+              Shader& bgShader)                  // ★ Shader 直接由外部傳入或 get<Shader> 傳入
         : UIContainer(x, y, width, height),
           m_eventBus(eventBus),
           m_consoleSystem(consoleSystem),
           m_logger(logger),
           m_resources(resourceManager),
-          m_bgShader(resourceManager.loadShader(
-              "ConsoleBackground",
-              "./assets/shaders/console_bg.vert",
-              "./assets/shaders/console_bg.frag"
-          )) {
+          m_bgShader(bgShader) {
 
         setVisible(false);
         setPassThrough(false);
@@ -53,6 +51,14 @@ public:
         layoutChildren(width, height);
         bindEvents();
     }
+
+    // 亦提供便利建構子：自動向 IResourceManager 透過泛型索取 Shader
+    UIConsole(float x, float y, float width, float height,
+              EventBus& eventBus,
+              ConsoleSystem& consoleSystem, LoggerSystem& logger,
+              IResourceManager& resourceManager)
+        : UIConsole(x, y, width, height, eventBus, consoleSystem, logger, resourceManager,
+                    resourceManager.get<Shader>("ConsoleBackground")) {}
 
     void setSize(float width, float height) {
         UIContainer::setSize(width, height);
@@ -152,8 +158,8 @@ private:
             }
         });
     }
-	
-	void refreshLogs() {
+
+    void refreshLogs() {
         m_scrollView->clearItems();
         const auto& logs = m_logger.getLogs();
         float curY = 0.0f;
@@ -173,7 +179,7 @@ private:
     EventBus& m_eventBus;
     ConsoleSystem& m_consoleSystem;
     LoggerSystem& m_logger;
-    ResourceManager& m_resources;
+    IResourceManager& m_resources; // ★ 抽象介面引用
     Shader& m_bgShader;
 
     UIScrollView* m_scrollView{nullptr};

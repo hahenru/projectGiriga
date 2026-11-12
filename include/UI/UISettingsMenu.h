@@ -5,7 +5,7 @@
 #include <UI/UIButton.h>
 #include <UI/UIText.h>
 #include <UI/UIVerticalLayout.h>
-#include <Resource/ResourceManager.h>
+#include <Resource/IResourceManager.h>
 #include <Event/EventBus.h>
 #include <vector>
 #include <string>
@@ -14,7 +14,7 @@
 
 class UISettingsMenu : public UIPanel {
 public:
-    using PageBuilder = std::function<void(UIPanel* contentArea, ResourceManager& resources, EventBus& eventBus)>;
+    using PageBuilder = std::function<void(UIPanel* contentArea, IResourceManager& resources, EventBus& eventBus)>;
 
     struct TabEntry {
         std::string group;          // 所屬分組 ID (例如 "system", "gameplay")
@@ -33,7 +33,7 @@ public:
     };
 
     UISettingsMenu(float x, float y, float width, float height,
-                   ResourceManager& resources, EventBus& eventBus);
+                   IResourceManager& resources, EventBus& eventBus);
     ~UISettingsMenu() override = default;
 
     // ★ 支援分組標籤的動態註冊介面
@@ -53,7 +53,7 @@ public:
 private:
     void rebuildTabsUI();
 
-    ResourceManager& m_resources;
+    IResourceManager& m_resources;
     EventBus&        m_eventBus;
 
     std::vector<TabEntry> m_registeredTabs;

@@ -5,7 +5,7 @@
 #include <UI/UIConsole.h>
 #include <UI/UISettingsMenu.h>
 #include <Renderer/UIRenderer.h>
-#include <Resource/ResourceManager.h>
+#include <Resource/IResourceManager.h>
 #include <Font/FontLoader.h>
 #include <Event/EventBus.h>
 #include <System/KeyboardSystem.h>
@@ -27,7 +27,7 @@ public:
 		KeyboardSystem& keyboard,
 		ConsoleSystem& console,
 		LoggerSystem& logger,
-		ResourceManager& resources,
+		IResourceManager& resources,
 		float screenWidth, float screenHeight);
 
     ~UIManager() = default;
@@ -49,7 +49,7 @@ private:
 
     UIRenderer m_renderer;
     EventBus& m_eventBus;
-    ResourceManager& m_resources;
+    IResourceManager& m_resources;
 
     // 三棵樹
     UIContainer m_rootUI;                                   // 1) 全局持久層 (Console, Toast 等)

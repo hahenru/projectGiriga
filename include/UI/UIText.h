@@ -2,7 +2,7 @@
 #define GIRIGARA_UI_UI_TEXT_H
 
 #include <UI/UIElement.h>
-#include <Resource/ResourceManager.h>
+#include <Resource/IResourceManager.h>
 #include <Font/FontLoader.h>
 #include <memory>
 #include <string>
@@ -12,7 +12,7 @@ class UIRenderer;
 class UIText : public UIElement {
 public:
     // ★ 現代化建構：由 ResourceManager 依 fontName 取得字型
-    UIText(float x, float y, ResourceManager& resources,
+    UIText(float x, float y, IResourceManager& resources,
            const std::u32string& text, unsigned int fontSize = 0,
            std::string fontName = "default");
 
@@ -34,7 +34,7 @@ public:
     bool handleMouseButton(int button, int action, int mods, double x, double y) override;
 
 private:
-    ResourceManager& m_resources;
+    IResourceManager& m_resources;
     std::string m_fontName;
     std::u32string m_text;
     std::unique_ptr<TextTexture> m_texture = nullptr;

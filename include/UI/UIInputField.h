@@ -5,7 +5,7 @@
 #include <UI/UIText.h>
 #include <Event/EventBus.h>
 #include <Renderer/UIRenderer.h>
-#include <Resource/ResourceManager.h>
+#include <Resource/IResourceManager.h>
 #include <GLFW/glfw3.h>
 #include <string>
 #include <functional>
@@ -75,7 +75,7 @@ public:
     using SubmitCallback = std::function<void(const std::string&)>;
 
 	UIInputField(float x, float y, float width, float height,
-				 ResourceManager& resources, EventBus& eventBus, unsigned int fontSize = 18,
+				 IResourceManager& resources, EventBus& eventBus, unsigned int fontSize = 18,
 				 std::string fontName = "default")
 		: UIContainer(x, y, width, height),
 		  m_resources(resources),
@@ -193,7 +193,7 @@ private:
         });
     }
 
-    ResourceManager& m_resources;
+    IResourceManager& m_resources;
 	std::string m_fontName;
     EventBus& m_eventBus;
     UIText* m_textLabel{nullptr};

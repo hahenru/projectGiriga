@@ -33,3 +33,6 @@ repo
 compile_commands.json
 .directory
 .DS_Store
+
+# 特殊項目
+tree.txt

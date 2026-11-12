@@ -1,6 +1,7 @@
 #include <UI/UIButton.h>
 #include <Renderer/UIRenderer.h>
-#include <Resource/ResourceManager.h>
+#include <UI/UIText.h>
+#include <Resource/IResourceManager.h>
 #include <GLFW/glfw3.h>
 
 UIButton::UIButton(float x, float y, float width, float height)
@@ -8,7 +9,7 @@ UIButton::UIButton(float x, float y, float width, float height)
     setPassThrough(false);
 }
 
-UIText* UIButton::setLabel(ResourceManager& resources, const std::u32string& text,
+UIText* UIButton::setLabel(IResourceManager& resources, const std::u32string& text,
                             float r, float g, float b, float a,
                             std::string fontName) {
     if (!m_label) {

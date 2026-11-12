@@ -6,7 +6,7 @@ UIManager::UIManager(Shader& uiShader,
                      KeyboardSystem& keyboard,
                      ConsoleSystem& console,
                      LoggerSystem& logger,
-                     ResourceManager& resources,
+                     IResourceManager& resources,
                      float screenWidth, float screenHeight)
 : m_renderer(uiShader, screenWidth, screenHeight),
 m_eventBus(eventBus),
@@ -27,7 +27,7 @@ m_screenHeight(screenHeight) {
                                                            menuW, menuH,
                                                            m_resources, m_eventBus
     );
-
+	
     // 2. 掛載 Console
     m_console = m_rootUI.emplaceChild<UIConsole>(
         0.0f, 0.0f, screenWidth, screenHeight,

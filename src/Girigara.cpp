@@ -9,7 +9,7 @@ namespace fs = std::filesystem;
 
 Girigara::Girigara(int width, int height, const std::string& title)
     // 1. 初始化底層所有系統與環境上下文
-    : m_context(std::make_unique<EngineContext>(width, height, title)) {
+    : m_context(std::make_unique<ClientContext>(width, height, title)) {
 
     m_context->logger->info("[Girigara] 執行時期環境啟動中...");
 
@@ -20,7 +20,7 @@ Girigara::Girigara(int width, int height, const std::string& title)
 }
 
 Girigara::~Girigara() {
-    // 顯式清空上層管理器，確保場景與 UI 的釋放早於 EngineContext 銷毀
+    // 顯式清空上層管理器，確保場景與 UI 的釋放早於 ClientContext 銷毀
     m_uiManager.reset();
     m_sceneManager.reset();
 }
@@ -30,9 +30,16 @@ void Girigara::initSubsystems() {
     int fbWidth = 800, fbHeight = 600;
     glfwGetFramebufferSize(m_context->window->getWindow(), &fbWidth, &fbHeight);
     glViewport(0, 0, fbWidth, fbHeight);
+	
+	// 載入預設字型 ("default") — 必須在 UIManager 建構之前完成！
+    m_context->clientResources->loadFont("default", "./assets/font/NaikaiFont-Regular.ttf", 48);
+	
+	// 給Console用的背景板。
+	m_uiShader = &m_context->clientResources->loadShader("ui", "./assets/shaders/ui.vert", "./assets/shaders/ui.frag");
+	m_context->clientResources->loadShader("ConsoleBackground", "./assets/shaders/console_bg.vert", "./assets/shaders/console_bg.frag");
 
     // 2. 載入 UI Shader 並配置給視窗投影
-    m_uiShader = &m_context->resources->loadShader("ui", "./assets/shaders/ui.vert", "./assets/shaders/ui.frag");
+    m_uiShader = &m_context->clientResources->loadShader("ui", "./assets/shaders/ui.vert", "./assets/shaders/ui.frag");
     m_context->window->setShader(m_uiShader);
     m_context->window->updateProjection(fbWidth, fbHeight);
 	
@@ -48,7 +55,7 @@ void Girigara::initSubsystems() {
         *m_context->keyboard,
         *m_context->console,
         *m_context->logger,
-        *m_context->resources,
+        *m_context->clientResources,
         static_cast<float>(fbWidth),
         static_cast<float>(fbHeight)
     );
@@ -74,8 +81,8 @@ void Girigara::loadSystemScripts(const std::string& directoryPath) {
             std::string scriptName = entry.path().stem().string();
 
             try {
-                m_context->resources->loadScript(scriptName, filePath);
-                const auto& scriptRes = m_context->resources->getScript(scriptName);
+                m_context->clientResources->loadScript(scriptName, filePath);
+                const auto& scriptRes = m_context->clientResources->getScript(scriptName);
 
                 if (m_context->scriptEngine->executeResource(scriptRes)) {
                     m_context->logger->info("[Script] 已註冊系統腳本: " + scriptName + " (" + filePath + ")");

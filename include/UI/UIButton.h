@@ -2,8 +2,7 @@
 #define GIRIGARA_UI_UI_BUTTON_H
 
 #include <UI/UIContainer.h>
-#include <UI/UIText.h>
-#include <Resource/ResourceManager.h>
+#include <Resource/IResourceManager.h>
 
 #include <array>
 #include <functional>
@@ -19,6 +18,7 @@ struct ButtonColors {
 };
 
 class UIRenderer;
+class UIText;
 
 class UIButton : public UIContainer {
 public:
@@ -39,7 +39,7 @@ public:
     bool isLocked() const { return m_isLocked; }
 
     // 設定按鈕標籤文字與字型
-    UIText* setLabel(ResourceManager& resources, const std::u32string& text,
+    UIText* setLabel(IResourceManager& resources, const std::u32string& text,
                      float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f,
                      std::string fontName = "default");
 
