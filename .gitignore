@@ -13,9 +13,7 @@ build-flatpak/
 projectGIRIGARA
 .flatpak-builder/
 
-# 系統當機傾印與除錯檔 (包含剛剛發生的 coredump)
-core
-core.*
+# 系統當機傾印與除錯檔 (包含剛剛發生的 coredump
 *.log
 *.stackdump
 
