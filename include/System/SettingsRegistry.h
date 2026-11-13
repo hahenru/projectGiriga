@@ -2,7 +2,7 @@
 #ifndef GIRIGARA_SYSTEM_SETTINGS_REGISTRY_H
 #define GIRIGARA_SYSTEM_SETTINGS_REGISTRY_H
 
-#include <Core/UUID.h>
+#include <Core/Depersonalization.h>
 #include <System/LoggerSystem.h>
 #include <UI/UIElement.h>
 #include <UI/UIButton.h>
@@ -14,7 +14,7 @@
 using SettingValue = std::variant<bool, int, float, std::string>;
 
 struct SettingItem {
-    Core::UUID id;
+    Depersonalization id;
     std::string className;
     std::string groupName;
     std::string keyName;

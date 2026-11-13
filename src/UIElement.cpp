@@ -1,26 +1,26 @@
 #include <UI/UIElement.h>
 #include <iostream>
 
-UIElement::UIElement() : Core::Identifiable() {
-    UIRegistry::getInstance().registerElement(m_uuid, "", this);
+UIElement::UIElement() : Identifiable() {
+    UIRegistry::getInstance().registerElement(m_remorse, "", this);
 }
 
 UIElement::UIElement(float x, float y, float width, float height, std::string name)
-: Core::Identifiable(std::move(name)),
+: Identifiable(std::move(name)),
 m_x(x), m_y(y), m_width(width), m_height(height) {
-    UIRegistry::getInstance().registerElement(m_uuid, m_name, this);
+    UIRegistry::getInstance().registerElement(m_remorse, m_name, this);
 }
 
 UIElement::~UIElement() {
     // 物件銷毀時自動脫離全域註冊表
-    UIRegistry::getInstance().unregisterElement(m_uuid, m_name);
+    UIRegistry::getInstance().unregisterElement(m_remorse, m_name);
 }
 
 void UIElement::setName(const std::string& name) {
-    // 修正：註銷時傳入真實自身 m_uuid，確保正確移除舊鍵值映射
-    UIRegistry::getInstance().unregisterElement(m_uuid, m_name);
+    // 修正：註銷時傳入真實自身 m_remorse，確保正確移除舊鍵值映射
+    UIRegistry::getInstance().unregisterElement(m_remorse, m_name);
     Identifiable::setName(name);
-    UIRegistry::getInstance().registerElement(m_uuid, m_name, this);
+    UIRegistry::getInstance().registerElement(m_remorse, m_name, this);
 }
 
 void UIElement::setVisible(bool visible) {

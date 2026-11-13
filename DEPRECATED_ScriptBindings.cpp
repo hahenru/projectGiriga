@@ -1,7 +1,18 @@
-#include <Script/ScriptBindings.h>
-#include <Script/ScriptEngine.h>
-#include <Core/CoreContext.h>
-
+// =========================================================================
+// [DEPRECATED] 已棄用：集中式 Lua 腳本綁定對照表
+// 說明：本檔案已移出建置流程，僅作為分散式重構期間的 API 對照清單。
+//       每完成一項子系統的自主事件綁定（RegisterScriptBindingEvent），
+//       請從下方清單打勾並刪除對應函式區塊，直至整份檔案清空後移除。
+//
+// 遷移進度追蹤：
+// [ ] 基礎日誌：EngineLog -> ScriptEngine 初始化內建
+// [ ] 設定系統：ChangeSettingByName, ChangeSettingByUUID, SetSettingEnabled -> SettingsRegistry
+// [ ] 音訊系統：Audio_PlayBGM, Audio_StopBGM, Audio_PlaySFX -> AudioSystem
+// [ ] 介面系統：BindUIUpdate, UI_SetPosition, FindUI, GetUIByUUID, UI_GetUUID,
+//              UI_GetName, UI_SetVisible, UI_GetX, UI_GetY, UI_IsDragging,
+//              CreateButton, SetPositionPercent -> UIManager
+// [ ] 場景系統：SwitchScene -> SceneManager
+// =========================================================================
 #warning "[TODO / Architecture] ScriptBindings.cpp 目前已暫時停用 UI 與 Audio 綁定！請盡快重構為分散式註冊機制（由各子系統透過 EventBus 或註冊器自行向 ScriptEngine 綁定）。"
 
 #if 0

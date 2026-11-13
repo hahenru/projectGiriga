@@ -2,7 +2,15 @@
 #define GIRIGARA_EVENT_EVENT_H
 
 #include <UI/UIContainer.h>
+
 #include <memory>
+#include <string>
+#include <vector>
+#include <variant>
+#include <Core/Depersonalization.h>
+extern "C" {
+    #include <lua.h>
+}
 
 // 基礎事件類別
 class Event {
@@ -105,6 +113,68 @@ public:
     double xoffset;
     double yoffset;
     int mods; // ★ 攜帶修飾鍵 (GLFW_MOD_CONTROL, GLFW_MOD_SHIFT 等)
+};
+
+// 1. 模組向 ScriptEngine 推送/撤銷專屬 Lua 函式
+class RegisterScriptBindingEvent : public Event {
+public:
+    struct FuncEntry {
+        std::string name;
+        lua_CFunction func;
+    };
+
+    RegisterScriptBindingEvent(Depersonalization providerId,
+                               std::string registryKey,
+                               void* instancePtr,
+                               std::vector<FuncEntry> functions)
+    : providerId(providerId),
+    registryKey(std::move(registryKey)),
+    instancePtr(instancePtr),
+    functions(std::move(functions)) {}
+
+    Depersonalization providerId;
+    std::string registryKey;
+    void* instancePtr;
+    std::vector<FuncEntry> functions;
+};
+
+class UnregisterScriptBindingEvent : public Event {
+public:
+    explicit UnregisterScriptBindingEvent(Depersonalization providerId)
+    : providerId(providerId) {}
+
+    Depersonalization providerId;
+};
+
+// 2. 遠端設定指令事件（Lua 腳本、Console 或 UI 皆可發布）
+using RemoteSettingValue = std::variant<bool, int, float, std::string>;
+
+class RemoteSettingRequestEvent : public Event {
+public:
+    // 依路徑修改 (如 "Audio.Volume.BGM")
+    RemoteSettingRequestEvent(std::string path, RemoteSettingValue val, bool force = true)
+    : path(std::move(path)), value(std::move(val)), force(force) {}
+
+    // 依 UUID 修改
+    RemoteSettingRequestEvent(uint64_t uuid, RemoteSettingValue val, bool force = true)
+    : uuid(uuid), value(std::move(val)), force(force) {}
+
+    std::string path;
+    uint64_t uuid = 0;
+    RemoteSettingValue value;
+    bool force = true;
+    bool succeeded = false; // 由 SettingsRegistry 處理後回填結果
+};
+
+// 3. 設定已實際變更廣播事件（通知 UISettingsMenu 同步刷新畫面控制項）
+class SettingChangedEvent : public Event {
+public:
+    SettingChangedEvent(std::string path, uint64_t uuid, RemoteSettingValue val)
+    : path(std::move(path)), uuid(uuid), value(std::move(val)) {}
+
+    std::string path;
+    uint64_t uuid;
+    RemoteSettingValue value;
 };
 
 #endif // GIRIGARA_EVENT_EVENT_H

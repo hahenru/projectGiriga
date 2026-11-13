@@ -22,7 +22,6 @@ COMMON_SRC = \
     src/SceneManager.cpp \
     src/LuaScene.cpp \
     src/ScriptEngine.cpp \
-    src/ScriptBindings.cpp \
     src/ScriptResource.cpp \
     src/ConsoleSystem.cpp \
 	src/Girigara.cpp \

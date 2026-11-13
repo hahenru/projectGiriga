@@ -19,13 +19,10 @@ m_screenHeight(screenHeight) {
     m_rootUI.setPassThrough(true);
 
     // 1. 掛載設定選單 (先於 Console，確保 Console 絕對置頂)
-    float menuW = screenWidth * 0.75f;
-    float menuH = screenHeight * 0.75f;
     m_settingsMenu = m_rootUI.emplaceChild<UISettingsMenu>(
-        (screenWidth - menuW) * 0.5f,
-                                                           (screenHeight - menuH) * 0.5f,
-                                                           menuW, menuH,
-                                                           m_resources, m_eventBus
+        0.0f, 0.0f,
+        screenWidth, screenHeight,
+        m_resources, m_eventBus
     );
 	
     // 2. 掛載 Console
@@ -83,15 +80,14 @@ void UIManager::onWindowResize(float width, float height) {
     if (m_console) {
         m_console->setSize(width, height);
     }
+
     if (m_activeSceneUI) {
         m_activeSceneUI->setSize(width, height);
     }
-    // ★ 關鍵修復：視窗縮放時，重新計算設定選單的置中座標與寬高（占 75%）
+
     if (m_settingsMenu) {
-        float menuW = width * 1.0f;
-        float menuH = height * 1.0f;
-        m_settingsMenu->setPosition((width - menuW) * 0.5f, (height - menuH) * 0.5f);
-        m_settingsMenu->setSize(menuW, menuH);
+        m_settingsMenu->setPosition(0.0f, 0.0f);
+        m_settingsMenu->setSize(width, height);
     }
 }
 

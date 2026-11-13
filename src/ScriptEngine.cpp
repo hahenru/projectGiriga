@@ -1,10 +1,13 @@
 #include <Script/ScriptEngine.h>
+#include <Event/Event.h>
 #include <utility>
 
-ScriptEngine::ScriptEngine() {
+ScriptEngine::ScriptEngine(EventBus& eventBus)
+: m_eventBus(eventBus) {
     m_L = luaL_newstate();
     if (m_L) {
-        luaL_openlibs(m_L); // 開啟標準函式庫 (base, string, table, math 等)
+        luaL_openlibs(m_L); // 開啟標準函式庫
+        bindEvents();
     } else {
         std::cerr << "[ScriptEngine] Failed to initialize Lua state.\n";
     }
@@ -14,20 +17,57 @@ ScriptEngine::~ScriptEngine() {
     release();
 }
 
-ScriptEngine::ScriptEngine(ScriptEngine&& other) noexcept : m_L(other.m_L) {
-    other.m_L = nullptr;
-}
+void ScriptEngine::bindEvents() {
+    // 1. 接收各子系統推送過來的 Lua 函式綁定
+    m_eventBus.subscribe<RegisterScriptBindingEvent>([this](RegisterScriptBindingEvent& e) {
+        if (!m_L) return;
 
-ScriptEngine& ScriptEngine::operator=(ScriptEngine&& other) noexcept {
-    if (this != &other) {
-        release();
-        m_L = other.m_L;
-        other.m_L = nullptr;
-    }
-    return *this;
+        // 存入子系統實體指標至 Lua Registry（供靜態 lua_CFunction 取回 this）
+        if (!e.registryKey.empty() && e.instancePtr) {
+            lua_pushstring(m_L, e.registryKey.c_str());
+            lua_pushlightuserdata(m_L, e.instancePtr);
+            lua_settable(m_L, LUA_REGISTRYINDEX);
+        }
+
+        // 註冊所有推送的 C 函式並記錄名稱，供日後解除綁定使用
+        auto& record = m_boundModules[e.providerId];
+        record.registryKey = e.registryKey;
+
+        for (const auto& fn : e.functions) {
+            lua_register(m_L, fn.name.c_str(), fn.func);
+            record.funcNames.push_back(fn.name);
+        }
+    }, m_id);
+
+    // 2. 接收子系統的解除綁定請求（模組卸載或切換場景時）
+    m_eventBus.subscribe<UnregisterScriptBindingEvent>([this](UnregisterScriptBindingEvent& e) {
+        if (!m_L) return;
+
+        auto it = m_boundModules.find(e.providerId);
+        if (it == m_boundModules.end()) return;
+
+        // 將 Lua 全域環境中的對應函式設為 nil
+        for (const auto& fnName : it->second.funcNames) {
+            lua_pushnil(m_L);
+            lua_setglobal(m_L, fnName.c_str());
+        }
+
+        // 清除 Lua Registry 中的指標
+        if (!it->second.registryKey.empty()) {
+            lua_pushstring(m_L, it->second.registryKey.c_str());
+            lua_pushnil(m_L);
+            lua_settable(m_L, LUA_REGISTRYINDEX);
+        }
+
+        m_boundModules.erase(it);
+    }, m_id);
 }
 
 void ScriptEngine::release() {
+    // 先向 EventBus 退訂自身監聽器，防止關閉後仍有事件打進來
+    m_eventBus.unsubscribeByOwner(m_id);
+    m_boundModules.clear();
+
     if (m_L) {
         lua_close(m_L);
         m_L = nullptr;
@@ -79,7 +119,6 @@ bool ScriptEngine::callFunction(const std::string& funcName) {
 }
 
 bool ScriptEngine::executeResource(const ScriptResource& script) {
-    // 使用 luaL_loadbuffer 載入腳本源碼，以腳本檔案路徑作為 chunk 名稱（方便出錯時噴出正確行號）
     int status = luaL_loadbuffer(m_L, script.getCode().c_str(), script.getCode().size(), script.getPath().c_str());
     if (status != LUA_OK) {
         reportErrors(status);

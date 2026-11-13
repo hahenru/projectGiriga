@@ -3,9 +3,9 @@
 CoreContext::CoreContext()
     : logger(std::make_unique<LoggerSystem>(65535)),
       eventBus(std::make_unique<EventBus>()),
-      scriptEngine(std::make_unique<ScriptEngine>()),
-      settings(std::make_unique<SettingsRegistry>(*logger)),
-      console(std::make_unique<ConsoleSystem>(*logger)) {
+      scriptEngine(std::make_unique<ScriptEngine>(*eventBus)),
+      console(std::make_unique<ConsoleSystem>(*logger)),
+      settings(std::make_unique<SettingsRegistry>(*logger)) {
 
     console->setScriptEngine(scriptEngine.get());
 

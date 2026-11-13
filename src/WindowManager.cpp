@@ -15,6 +15,9 @@ WindowManager::WindowManager(int width, int height, const std::string& title, Ev
     glfwMakeContextCurrent(m_window);
     m_logger.info("[WindowManager] 視窗建立成功");
 
+    // 初始化縮放比例快取
+    updateScaleCache();
+
     // 將 this 指針綁定至視窗使用者資料
     glfwSetWindowUserPointer(m_window, this);
 
@@ -24,7 +27,9 @@ WindowManager::WindowManager(int width, int height, const std::string& title, Ev
     glfwSetKeyCallback(m_window, staticKeyCallback);
     glfwSetCharCallback(m_window, staticCharCallback);
     glfwSetWindowFocusCallback(m_window, staticWindowFocusCallback);
+    glfwSetWindowSizeCallback(m_window, staticWindowSizeCallback);
     glfwSetFramebufferSizeCallback(m_window, staticFramebufferSizeCallback);
+    glfwSetWindowContentScaleCallback(m_window, staticWindowContentScaleCallback);
     glfwSetScrollCallback(m_window, staticScrollCallback);
     m_logger.info("[WindowManager] GLFW callback function註冊完畢");
 }
@@ -38,11 +43,26 @@ WindowManager::~WindowManager() {
         glfwSetKeyCallback(m_window, nullptr);
         glfwSetCharCallback(m_window, nullptr);
         glfwSetWindowFocusCallback(m_window, nullptr);
+        glfwSetWindowSizeCallback(m_window, nullptr);
         glfwSetFramebufferSizeCallback(m_window, nullptr);
+        glfwSetWindowContentScaleCallback(m_window, nullptr);
         glfwSetScrollCallback(m_window, nullptr);
 
         glfwDestroyWindow(m_window);
         m_window = nullptr;
+    }
+}
+
+void WindowManager::updateScaleCache() {
+    int winWidth = 0, winHeight = 0;
+    int fbWidth = 0, fbHeight = 0;
+    glfwGetWindowSize(m_window, &winWidth, &winHeight);
+    glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
+
+    // 視窗最小化時 winWidth/winHeight 可能為 0，保留舊比例避免除以零
+    if (winWidth > 0 && winHeight > 0 && fbWidth > 0 && fbHeight > 0) {
+        m_scaleX = static_cast<double>(fbWidth) / static_cast<double>(winWidth);
+        m_scaleY = static_cast<double>(fbHeight) / static_cast<double>(winHeight);
     }
 }
 
@@ -69,37 +89,13 @@ void WindowManager::updateProjection(int width, int height) {
 // -------------------------------------------------------------
 
 void WindowManager::onCursorPos(double xpos, double ypos) {
-    int winWidth, winHeight;
-    int fbWidth, fbHeight;
-    glfwGetWindowSize(m_window, &winWidth, &winHeight);
-    glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
-
-    // 計算視窗邏輯像素與 Framebuffer 像素之間的縮放比例
-    double scaleX = (winWidth > 0) ? (static_cast<double>(fbWidth) / winWidth) : 1.0;
-    double scaleY = (winHeight > 0) ? (static_cast<double>(fbHeight) / winHeight) : 1.0;
-
-    double actualX = xpos * scaleX;
-    double actualY = ypos * scaleY;
-
-    m_eventBus.publish(MouseMovedEvent(actualX, actualY));
+    m_eventBus.publish(MouseMovedEvent(xpos * m_scaleX, ypos * m_scaleY));
 }
 
 void WindowManager::onMouseButton(int button, int action, int mods) {
     double xpos, ypos;
     glfwGetCursorPos(m_window, &xpos, &ypos);
-
-    int winWidth, winHeight;
-    int fbWidth, fbHeight;
-    glfwGetWindowSize(m_window, &winWidth, &winHeight);
-    glfwGetFramebufferSize(m_window, &fbWidth, &fbHeight);
-
-    double scaleX = (winWidth > 0) ? (static_cast<double>(fbWidth) / winWidth) : 1.0;
-    double scaleY = (winHeight > 0) ? (static_cast<double>(fbHeight) / winHeight) : 1.0;
-
-    double actualX = xpos * scaleX;
-    double actualY = ypos * scaleY;
-
-    m_eventBus.publish(MouseButtonEvent(button, action, mods, actualX, actualY));
+    m_eventBus.publish(MouseButtonEvent(button, action, mods, xpos * m_scaleX, ypos * m_scaleY));
 }
 
 void WindowManager::onKey(int key, int scancode, int action, int mods) {
@@ -126,12 +122,20 @@ void WindowManager::onWindowFocus(int focused) {
     m_eventBus.publish(WindowFocusEvent(m_windowFocused));
 }
 
+void WindowManager::onWindowSize(int /*width*/, int /*height*/) {
+    updateScaleCache();
+}
+
 void WindowManager::onFramebufferSize(int width, int height) {
+    updateScaleCache();
     glViewport(0, 0, width, height);
     updateProjection(width, height);
 
-    // ★ 發布視窗大小改變事件
     m_eventBus.publish(WindowResizeEvent(width, height));
+}
+
+void WindowManager::onWindowContentScale(float /*xscale*/, float /*yscale*/) {
+    updateScaleCache();
 }
 
 void WindowManager::onScroll(double xoffset, double yoffset) {
@@ -193,4 +197,14 @@ void WindowManager::staticScrollCallback(GLFWwindow* window, double xoffset, dou
     if (self) {
         self->onScroll(xoffset, yoffset);
     }
+}
+
+void WindowManager::staticWindowSizeCallback(GLFWwindow* window, int width, int height) {
+    auto* self = static_cast<WindowManager*>(glfwGetWindowUserPointer(window));
+    if (self) self->onWindowSize(width, height);
+}
+
+void WindowManager::staticWindowContentScaleCallback(GLFWwindow* window, float xscale, float yscale) {
+    auto* self = static_cast<WindowManager*>(glfwGetWindowUserPointer(window));
+    if (self) self->onWindowContentScale(xscale, yscale);
 }

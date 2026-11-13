@@ -1,7 +1,7 @@
 #ifndef GIRIGARA_UI_UI_ELEMENT_H
 #define GIRIGARA_UI_UI_ELEMENT_H
 
-#include <Core/UUID.h>
+#include <Core/Depersonalization.h>
 #include <Core/Identifiable.h>
 #include <Shader/Shader.h>
 #include <Script/LuaRef.h>
@@ -16,7 +16,7 @@ enum class UIUnit {
 // 前置宣告
 class UIRenderer;
 
-class UIElement : public Core::Identifiable {
+class UIElement : public Identifiable {
 public:
     virtual ~UIElement();
 
