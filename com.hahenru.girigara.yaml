@@ -15,6 +15,7 @@ finish-args:
   - --socket=pulseaudio
   # 共享記憶體通訊
   - --share=ipc
+  - --share=network
 
 modules:
   # 1. 建置 Lua (若 Runtime 內沒有滿足需求的 Lua 版本，可作為獨立 module 編譯)
@@ -55,13 +56,26 @@ modules:
       - type: git
         url: https://github.com/mackron/miniaudio.git
         tag: '0.11.26'
+# 網路庫
+  - name: enet
+    buildsystem: simple
+    build-commands:
+      - gcc -O2 -fPIC -Iinclude -DHAS_GETADDRINFO=1 -DHAS_GETNAMEINFO=1 -DHAS_GETHOSTBYADDR_R=1 -DHAS_GETHOSTBYNAME_R=1 -DHAS_POLL=1 -DHAS_FCNTL=1 -DHAS_INET_PTON=1 -DHAS_INET_NTOP=1 -DHAS_MSGHDR_FLAGS=1 -DHAS_SOCKLEN_T=1 -c *.c
+      - ar rcs libenet.a *.o
+      - install -Dm644 libenet.a /app/lib/libenet.a
+      - mkdir -p /app/include
+      - cp -r include/enet /app/include/
+    sources:
+      - type: git
+        url: https://github.com/lsalzman/enet.git
+        commit: 5a9c537
 
 
 # 3. 建置專案主程式
   - name: projectGIRIGARA
     buildsystem: simple
     build-commands:
-      - make linux TARGET=build/projectGIRIGARA CXXFLAGS="-g -std=c++23 -MMD -MP -I./include -I/app/include $(pkg-config --cflags freetype2)" LDFLAGS="-L/app/lib -L/app/lib64 -L/app/lib/x86_64-linux-gnu -lglfw -lGL -ldl -llua -lpthread -lasound -lm $(pkg-config --libs freetype2)"
+      - make linux TARGET=build/projectGIRIGARA CXXFLAGS="-g -std=c++23 -MMD -MP -I./include -I/app/include $(pkg-config --cflags freetype2)" LDFLAGS="-L/app/lib -L/app/lib64 -L/app/lib/x86_64-linux-gnu -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet $(pkg-config --libs freetype2)"
 
       - install -d /app/bin
       - install -d /app/share/com.hahenru.girigara

@@ -53,12 +53,15 @@ install -m 755 build/projectGIRIGARA %{buildroot}/opt/%{name}/projectGIRIGARA
 cp -r assets %{buildroot}/opt/%{name}/assets
 
 # 3. 建立封裝啟動腳本，確保執行時的工作目錄 (CWD) 切換到資源所在位置
-cat << 'EOF' > %{buildroot}/usr/bin/girigara
+cat << 'EOF' > %{buildroot}/usr/bin/projectGIRIGARA
 #!/bin/bash
 cd /opt/ProjectGirigara
 exec ./projectGIRIGARA "$@"
 EOF
-chmod 755 %{buildroot}/usr/bin/girigara
+chmod 755 %{buildroot}/usr/bin/projectGIRIGARA
+
+# 同時建立小寫別名 symlink，方便終端機輸入
+ln -sf projectGIRIGARA %{buildroot}/usr/bin/girigara
 
 # 4. 安裝現有的標準 Desktop 捷徑
 mkdir -p %{buildroot}/usr/share/applications
@@ -67,6 +70,7 @@ install -m 644 com.hahenru.girigara.desktop %{buildroot}/usr/share/applications/
 %files
 /opt/%{name}/projectGIRIGARA
 /opt/%{name}/assets
+/usr/bin/projectGIRIGARA
 /usr/bin/girigara
 /usr/share/applications/com.hahenru.girigara.desktop
 /usr/share/icons/hicolor/512x512/apps/com.hahenru.girigara.png

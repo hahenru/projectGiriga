@@ -91,6 +91,9 @@ PACKAGE_LINUX = $(BUILD_DIR)/ProjectGirigara_linux.tar.gz
 # ==========================================
 # MinGW-w64 Windows 交叉編譯設定 (由 Linux 端執行)
 # ==========================================
+# 定義資源編譯器
+WIN_WINDRES = x86_64-w64-mingw32-windres
+
 WIN_CXX = x86_64-w64-mingw32-g++
 WIN_CC  = x86_64-w64-mingw32-gcc
 WIN_PREFIX = /usr/x86_64-w64-mingw32/sys-root/mingw
@@ -99,11 +102,12 @@ WIN_CXXFLAGS = -O2 -std=c++23 -MMD -MP -I./include -I$(WIN_PREFIX)/include/freet
 WIN_CFLAGS   = -O2 -MMD -MP -I./include
 
 # Windows 交叉編譯連結參數 (加入 -lenet -lws2_32)
-WIN_LDFLAGS  = -L$(WIN_PREFIX)/lib \
+WIN_LDFLAGS  = -mwindows -Wl,--subsystem,windows \
+               -L$(WIN_PREFIX)/lib \
                -lglfw3 -llua -lopengl32 -lole32 \
                -lfreetype -lpng -lz -lbz2 \
-               -lgdi32 -limm32 -lwinmm -lpthread \
-               -lenet -lws2_32 \
+               -lgdi32 -limm32 -lpthread \
+               -lenet -lws2_32 -lwinmm \
                -static-libgcc -static-libstdc++ -static
 
 WIN_BUILD_DIR = $(BUILD_DIR)/win64
@@ -192,10 +196,16 @@ package_linux: $(TARGET) copy_assets_linux
 # ==========================================
 win64: $(WIN_TARGET) copy_assets_win package_win
 
-$(WIN_TARGET): $(WIN_OBJS)
+# 將 .rc 編譯成 win32.o 資源物件
+build/win64/GirigaraRC.o: Girigara.rc
+	@mkdir -p $(dir $@)
+	$(WIN_WINDRES) $< -o $@
+
+
+$(WIN_TARGET): $(WIN_OBJS) build/win64/GirigaraRC.o
 	@mkdir -p $(dir $@)
 	@echo "==> 靜態鏈結 $(WIN_TARGET) ..."
-	$(WIN_CXX) $(WIN_OBJS) -o $@ $(WIN_LDFLAGS)
+	$(WIN_CXX) $(WIN_OBJS) build/win64/GirigaraRC.o -o $@ $(WIN_LDFLAGS)
 
 $(WIN_BUILD_DIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)

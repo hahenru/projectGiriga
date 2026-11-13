@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+    <id>com.hahenru.girigara</id>
+    <metadata_license>CC0-1.0</metadata_license>
+    <project_license>Proprietary</project_license>
+    <name>Project Girigara</name>
+    <summary>OpenGL 4.3+ C++23 2D GUI and Game Engine</summary>
+    <description>
+        <p>Project Girigara is a modular game engine supporting dynamic Lua scripting, event routing, and customizable UI consoles.</p>
+    </description>
+    <releases>
+        <release version="0.1.5" date="2026-11-13">
+            <description>
+                <p>雙端架構重構與網路層實作更新：</p>
+                <ul>
+                    <li>引入 ENet 雙端網路通訊層（Client / Server 分流架構）</li>
+                    <li>重構 UIConsole 虛擬化物件池，大幅提升日誌滾動效能</li>
+                    <li>新增資源管理器雙端分離（ClientResourceManager / ServerResourceManager）</li>
+                </ul>
+            </description>
+        </release>
+
+        <release version="0.1.4" date="2026-11-07">
+            <description>
+                <p>初期引擎核心與設定系統更新：</p>
+                <ul>
+                    <li>新增動態 Lua 設定註冊系統（SettingsRegistry）</li>
+                    <li>修復視窗管理器與場景切換之記憶體穩定度問題</li>
+                </ul>
+            </description>
+        </release>
+    </releases>
+    <launchable type="desktop-id">com.hahenru.girigara.desktop</launchable>
+    <url type="homepage">https://hahenru.com</url>
+    <developer_name>Hahenru</developer_name>
+</component>
