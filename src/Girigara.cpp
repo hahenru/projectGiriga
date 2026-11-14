@@ -1,11 +1,18 @@
 #include <Girigara.h>
 
-#ifdef GIRIGARA_SERVER
+#if defined(GIRIGARA_SERVER)
+#include <Server/ServerConfig.h>
+
+Girigara::Girigara(const std::string& configPath) {
+    auto cfg = ServerConfig::loadOrCreate(configPath);
+    m_server = std::make_unique<ServerRuntime>(cfg.port, cfg.tickRate);
+    m_server->startNetwork(cfg.maxClients);
+}
 
 Girigara::Girigara(uint16_t port, int tickRate)
-    : m_server(std::make_unique<ServerRuntime>(port, tickRate)) {
-    // 獨立伺服器模式：直接啟動網路監聽
-    m_server->startNetwork();
+: m_server(std::make_unique<ServerRuntime>(port, tickRate)) {
+    // 手動指定埠號模式（預設最大 32 人）
+    m_server->startNetwork(32);
 }
 
 Girigara::~Girigara() {
@@ -16,16 +23,32 @@ void Girigara::run() {
     m_server->run();
 }
 
+#elif defined(GIRIGARA_TOOL)
+
+Girigara::Girigara(int width, int height, const std::string& title)
+: m_tool(std::make_unique<ToolRuntime>(width, height, title)) {}
+
+Girigara::~Girigara() {
+    m_tool.reset();
+}
+
+void Girigara::run() {
+    m_tool->run();
+}
+
 #else
 
 Girigara::Girigara(int width, int height, const std::string& title)
-    : m_client(std::make_unique<ClientRuntime>(width, height, title)) {}
+: m_client(std::make_unique<ClientRuntime>(width, height, title)) {}
 
 Girigara::~Girigara() {
+    #ifndef GIRIGARA_NO_INTEGRATED_SERVER
     stopIntegratedServer();
+    #endif
     m_client.reset();
 }
 
+#ifndef GIRIGARA_NO_INTEGRATED_SERVER
 void Girigara::startIntegratedServer(uint16_t port, int tickRate) {
     if (m_server) return; // 已經在運行中
 
@@ -47,6 +70,7 @@ void Girigara::stopIntegratedServer() {
         m_server.reset();
     }
 }
+#endif
 
 void Girigara::connectToServer(const std::string& host, uint16_t port) {
     if (m_client && m_client->getContext().network) {

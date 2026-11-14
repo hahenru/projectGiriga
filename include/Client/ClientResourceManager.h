@@ -5,6 +5,8 @@
 #include <Resource/FontResource.h>
 #include <Resource/AudioResource.h>
 #include <Resource/ScriptResource.h>
+#include <Resource/ImageResource.h>
+#include <Resource/GpkArchive.h>
 #include <unordered_map>
 #include <memory>
 
@@ -36,6 +38,16 @@ public:
     ScriptResource& loadScript(const std::string& name, const std::string& path);
     ScriptResource& getScript(const std::string& name);
 
+    // --- Texture ---
+    ImageResource& loadImage(const std::string& name, const std::vector<std::string>& candidates, bool flipVertically = true);
+    ImageResource& loadImage(const std::string& name, const std::string& path, bool flipVertically = true);
+    ImageResource& getImage(const std::string& name);
+
+    // --- Zip ---
+    bool mountArchive(const std::string& archivePath, const GpkArchive::Key256& key);
+    void setPreferArchive(bool prefer) { m_preferArchive = prefer; }
+    bool isPreferArchive() const { return m_preferArchive; }
+
     bool reload(const std::type_index type, const std::string& name) override;
 
 protected:
@@ -51,6 +63,12 @@ private:
     LoggerSystem& m_logger;
     std::unordered_map<std::string, FontConfig> m_fontConfigs;
     std::unordered_map<std::type_index, std::unordered_map<std::string, std::unique_ptr<IResource>>> m_registry;
+
+    // --- Zip ---
+    bool extractFromArchives(const std::string& virtualPath, std::vector<uint8_t>& outBytes) const;
+    std::vector<std::unique_ptr<GpkArchive>> m_archives;
+    bool m_preferArchive{false};
+    std::vector<std::string> m_mountedPaths;
 };
 
 #endif// GIRIGARA_CLIENT_CLIENT_CLIENTRESOURCEMANAGER_H

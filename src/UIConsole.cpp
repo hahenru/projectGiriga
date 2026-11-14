@@ -172,23 +172,7 @@ void UIConsole::update(float dt) {
 void UIConsole::render(UIRenderer& renderer) {
     if (!isVisible()) return;
 
-    m_bgShader.use();
-    GLuint bgProg = m_bgShader.getID();
-
-    glProgramUniformMatrix4fv(bgProg, 0, 1, GL_FALSE, renderer.getProjectionMatrix());
-    float model[16] = {
-        m_width, 0.0f,     0.0f, 0.0f,
-        0.0f,    m_height, 0.0f, 0.0f,
-        0.0f,    0.0f,     1.0f, 0.0f,
-        getGlobalX(), getGlobalY(), 0.0f, 1.0f
-    };
-    glProgramUniformMatrix4fv(bgProg, 1, 1, GL_FALSE, model);
-    glProgramUniform1f(bgProg, 2, m_elapsedTime);
-    glProgramUniform2f(bgProg, 3, m_width, m_height);
-
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    renderer.beginCurrent();
+    renderer.drawShaderQuad(m_bgShader, getGlobalX(), getGlobalY(), m_width, m_height, m_elapsedTime);
     UIContainer::render(renderer);
 }
 

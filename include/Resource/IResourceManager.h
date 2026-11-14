@@ -38,6 +38,7 @@ public:
         return "";
     }
 
+
 protected:
     virtual IResource* getInternal(std::type_index type, const std::string& name) = 0;
     virtual bool hasInternal(std::type_index type, const std::string& name) const = 0;

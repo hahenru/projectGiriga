@@ -7,22 +7,21 @@
 namespace fs = std::filesystem;
 
 ServerRuntime::ServerRuntime(uint16_t port, int tickRate)
-    : m_context(std::make_unique<ServerContext>()),
-      m_port(port),
-      m_tickRate(tickRate) {
+: m_context(std::make_unique<ServerContext>()),
+m_port(port),
+m_tickRate(tickRate) {
     m_context->logger->info("[Server] 無頭伺服器初始化中 (Port: " + std::to_string(m_port) + ")...");
 
     loadSystemScripts("./assets/sysScripts");
     m_sceneManager = std::make_unique<SceneManager>(*m_context);
 
-    // 綁定基礎網路事件並啟動 ENet 監聽
+    // 綁定基礎網路事件（實際監聽交由 startNetwork() 啟動）
     m_context->network->setOnConnect([this](auto&& peer) {
         m_context->logger->info("[Server] 新玩家連線！");
     });
     m_context->network->setOnDisconnect([this](auto&& peer) {
         m_context->logger->info("[Server] 玩家斷線。");
     });
-    m_context->network->startServer(m_port, 32);
 
     m_context->logger->info("[Server] 無頭伺服器就緒。");
 }

@@ -103,6 +103,10 @@ void ENetNode::poll(uint32_t timeoutMs) {
     }
 }
 
+uint16_t ENetNode::getBoundPort() const {
+    return m_host ? m_host->address.port : 0;
+}
+
 void ENetNode::send(uint32_t peerId, uint8_t channel, const void* data, size_t size, bool reliable) {
     if (!m_host || peerId >= m_peers.size() || !m_peers[peerId]) return;
 

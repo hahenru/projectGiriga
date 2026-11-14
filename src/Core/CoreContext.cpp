@@ -4,8 +4,11 @@ CoreContext::CoreContext()
     : eventBus(std::make_unique<EventBus>()),
       logger(std::make_unique<LoggerSystem>(*eventBus, 65535)),
       scriptEngine(std::make_unique<ScriptEngine>(*eventBus)),
-      console(std::make_unique<ConsoleSystem>(*logger)),
-      settings(std::make_unique<SettingsRegistry>(*eventBus, *logger)) {
+      console(std::make_unique<ConsoleSystem>(*logger))
+      #if !defined(GIRIGARA_SERVER) && !defined(GIRIGARA_TOOL)
+      , settings(std::make_unique<SettingsRegistry>(*eventBus, *logger))
+      #endif
+      {
 
     console->setScriptEngine(scriptEngine.get());
 
@@ -15,7 +18,9 @@ CoreContext::CoreContext()
 CoreContext::~CoreContext() {
     // 逆序釋放純邏輯子系統（EventBus 必須留到最後銷毀）
     console.reset();
+    #if !defined(GIRIGARA_SERVER) && !defined(GIRIGARA_TOOL)
     settings.reset();
+    #endif
     if (logger) {
         logger->info("[CoreContext] 核心子系統已釋放。");
         logger.reset();

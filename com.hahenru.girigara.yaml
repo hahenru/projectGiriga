@@ -18,7 +18,7 @@ finish-args:
   - --share=network
 
 modules:
-  # 1. 建置 Lua (若 Runtime 內沒有滿足需求的 Lua 版本，可作為獨立 module 編譯)
+  # 1. 建置 Lua
   - name: lua
     buildsystem: autotools
     no-autogen: true
@@ -32,7 +32,7 @@ modules:
       - make linux-readline MYCFLAGS="-fPIC"
       - make install INSTALL_TOP=/app
 
-# 2. 編譯 GLFW 3.4 (直接拉官方 Git Tag，保證不會 404)
+  # 2. 編譯 GLFW 3.5.1
   - name: glfw
     buildsystem: cmake-ninja
     config-opts:
@@ -46,7 +46,7 @@ modules:
         url: https://github.com/glfw/glfw.git
         tag: '3.5.1'
 
-# 2.5 綁定 miniaudio 0.11.26 Tag 並安裝至 /app/include
+  # 2.5 綁定 miniaudio 0.11.26 Tag 並安裝至 /app/include
   - name: miniaudio
     buildsystem: simple
     build-commands:
@@ -56,7 +56,8 @@ modules:
       - type: git
         url: https://github.com/mackron/miniaudio.git
         tag: '0.11.26'
-# 網路庫
+
+  # 網路庫
   - name: enet
     buildsystem: simple
     build-commands:
@@ -70,12 +71,36 @@ modules:
         url: https://github.com/lsalzman/enet.git
         commit: 5a9c537
 
+  # 壓縮庫 miniz 3.1.2 (自動安裝標頭至 /app/include/miniz/)
+  - name: miniz
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      - -DBUILD_SHARED_LIBS=OFF
+      - -DBUILD_EXAMPLES=OFF
+      - -DBUILD_TESTS=OFF
+    sources:
+      - type: git
+        url: https://github.com/richgel999/miniz.git
+        tag: '3.1.2'
 
-# 3. 建置專案主程式
+  # stb 單檔標頭
+  - name: stb
+    buildsystem: simple
+    build-commands:
+      - install -d /app/include/stb
+      - install -m 644 stb_image.h /app/include/stb/stb_image.h
+    sources:
+      - type: git
+        url: https://github.com/nothings/stb.git
+        commit: 5736b15f7ea0ffb08dd38af21067c314d6a3aae9
+
+  # 3. 建置專案主程式
   - name: projectGIRIGARA
     buildsystem: simple
     build-commands:
-      - make linux TARGET=build/projectGIRIGARA CXXFLAGS="-g -std=c++23 -MMD -MP -I./include -I/app/include $(pkg-config --cflags freetype2)" LDFLAGS="-L/app/lib -L/app/lib64 -L/app/lib/x86_64-linux-gnu -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet $(pkg-config --libs freetype2)"
+      - make -j${FLATPAK_BUILDER_N_JOBS} linux TARGET=build/linux/projectGIRIGARA CXXFLAGS="-g -std=c++23 -MMD -MP -I./include -I/app/include $(pkg-config --cflags freetype2)" LDFLAGS="-L/app/lib -L/app/lib64 -L/app/lib/x86_64-linux-gnu -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet -lminiz $(pkg-config --libs freetype2)"
 
       - install -d /app/bin
       - install -d /app/share/com.hahenru.girigara
@@ -83,7 +108,7 @@ modules:
       - install -d /app/share/metainfo
       - install -d /app/share/icons/hicolor/512x512/apps
 
-      - install -m 755 build/projectGIRIGARA /app/share/com.hahenru.girigara/projectGIRIGARA
+      - install -m 755 build/linux/projectGIRIGARA /app/share/com.hahenru.girigara/projectGIRIGARA
       - cp -r assets /app/share/com.hahenru.girigara/
 
       - |

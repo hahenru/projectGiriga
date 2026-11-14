@@ -42,6 +42,7 @@ public:
     void setOnConnect(OnConnectCallback cb) { m_onConnect = std::move(cb); }
     void setOnDisconnect(OnDisconnectCallback cb) { m_onDisconnect = std::move(cb); }
     void setOnReceive(OnReceiveCallback cb) { m_onReceive = std::move(cb); }
+    uint16_t getBoundPort() const;
 
 private:
     ENetHost* m_host{nullptr};

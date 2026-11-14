@@ -20,7 +20,9 @@ public:
     std::unique_ptr<LoggerSystem> logger;
     std::unique_ptr<ScriptEngine> scriptEngine;
     std::unique_ptr<ConsoleSystem> console;
+#if !defined(GIRIGARA_SERVER) && !defined(GIRIGARA_TOOL)
     std::unique_ptr<SettingsRegistry> settings;
+#endif
 
     // 資源管理的多型基底指針 (由衍生端在建構時掛載實體)
     IResourceManager* resources{nullptr};

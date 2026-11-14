@@ -29,7 +29,7 @@ public:
 			if (m_currentScene) {
 				m_currentScene->onExit();
 			}
-			m_currentScene = std::make_unique<T>(m_ctx, *this, std::forward<Args>(args)...);
+			m_currentScene = std::make_unique<T>(m_ctx, *this, std::move(args)...);
 			m_currentScene->onEnter();
 
 			// 直接走 EventBus 移交新場景的 UI 樹所有權
