@@ -4,10 +4,11 @@ CoreContext::CoreContext()
     : eventBus(std::make_unique<EventBus>()),
       logger(std::make_unique<LoggerSystem>(*eventBus, 65535)),
       scriptEngine(std::make_unique<ScriptEngine>(*eventBus)),
-      console(std::make_unique<ConsoleSystem>(*logger))
+      console(std::make_unique<ConsoleSystem>(*logger)),
       #if !defined(GIRIGARA_SERVER) && !defined(GIRIGARA_TOOL)
-      , settings(std::make_unique<SettingsRegistry>(*eventBus, *logger))
+         settings(std::make_unique<SettingsRegistry>(*eventBus, *logger)),
       #endif
+      fileSystem(std::make_unique<FileSystem>(*eventBus, *logger))
       {
 
     console->setScriptEngine(scriptEngine.get());
@@ -21,6 +22,7 @@ CoreContext::~CoreContext() {
     #if !defined(GIRIGARA_SERVER) && !defined(GIRIGARA_TOOL)
     settings.reset();
     #endif
+    fileSystem.reset();
     if (logger) {
         logger->info("[CoreContext] 核心子系統已釋放。");
         logger.reset();

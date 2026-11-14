@@ -222,6 +222,33 @@ namespace {
         return 0;
     }
 
+    // 17. UI_SetFontSize(elem, fontSize)
+    int lua_UI_SetFontSize(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        unsigned int sz = static_cast<unsigned int>(luaL_checkinteger(L, 2));
+        if (auto* txt = dynamic_cast<UIText*>(elem)) {
+            txt->setFontSize(sz);
+        } else if (auto* btn = dynamic_cast<UIButton*>(elem); btn && btn->getLabel()) {
+            btn->getLabel()->setFontSize(sz);
+        } else if (auto* input = dynamic_cast<UIInputField*>(elem)) {
+            input->setFontSize(sz);
+        }
+        return 0;
+    }
+
+    // 18. UI_GetScreenSize() -> width, height
+    int lua_UI_GetScreenSize(lua_State* L) {
+        UIManager* mgr = getUIManagerFromLua(L);
+        if (mgr) {
+            lua_pushnumber(L, static_cast<lua_Number>(mgr->getRootUI().getWidth()));
+            lua_pushnumber(L, static_cast<lua_Number>(mgr->getRootUI().getHeight()));
+        } else {
+            lua_pushnumber(L, 960.0);
+            lua_pushnumber(L, 640.0);
+        }
+        return 2;
+    }
+
     UIPropMap parsePropMapFromLuaTable(lua_State* L, int tableIdx) {
         UIPropMap props;
         if (!lua_istable(L, tableIdx)) return props;
@@ -484,7 +511,9 @@ void UIManager::registerScriptBindings() {
                            { "UI_OnClick",         lua_UI_OnClick },
                            { "UI_GetText",         lua_UI_GetText },
                            { "UI_SetText",         lua_UI_SetText },
-                           { "UI_SetButtonLocked", lua_UI_SetButtonLocked }
+                           { "UI_SetButtonLocked", lua_UI_SetButtonLocked },
+                           { "UI_SetFontSize",     lua_UI_SetFontSize },
+                           { "UI_GetScreenSize",   lua_UI_GetScreenSize }
                        }
     });
 }

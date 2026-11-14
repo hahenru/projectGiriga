@@ -21,6 +21,7 @@ COMMON_SRC = \
 	src/Core/CoreContext.cpp \
 	src/System/LoggerSystem.cpp \
 	src/System/ConsoleSystem.cpp \
+	src/System/FileSystem.cpp \
 	src/Scene/Scene.cpp \
 	src/Scene/SceneManager.cpp \
 	src/Scene/LuaScene.cpp \

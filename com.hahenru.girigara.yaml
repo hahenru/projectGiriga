@@ -16,6 +16,7 @@ finish-args:
   # 共享記憶體通訊
   - --share=ipc
   - --share=network
+  - --filesystem=home
 
 modules:
   # 1. 建置 Lua

@@ -7,6 +7,7 @@
 #include <Script/ScriptEngine.h>
 #include <System/SettingsRegistry.h>
 #include <Resource/IResourceManager.h>
+#include <System/FileSystem.h>
 
 class CoreContext {
 public:
@@ -23,6 +24,7 @@ public:
 #if !defined(GIRIGARA_SERVER) && !defined(GIRIGARA_TOOL)
     std::unique_ptr<SettingsRegistry> settings;
 #endif
+    std::unique_ptr<FileSystem> fileSystem;
 
     // 資源管理的多型基底指針 (由衍生端在建構時掛載實體)
     IResourceManager* resources{nullptr};
