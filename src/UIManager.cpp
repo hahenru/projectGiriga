@@ -1,5 +1,184 @@
 #include <UI/UIManager.h>
+#include <UI/UIWindow.h>
+#include <UI/UIButton.h>
+#include <UI/UIRegistry.h>
 #include <Event/Event.h>
+
+extern "C" {
+    #include <lua.h>
+    #include <lauxlib.h>
+}
+
+namespace {
+    constexpr const char* UI_MANAGER_REGISTRY_KEY = "GIRIGARA_UI_MANAGER_INSTANCE";
+
+    UIManager* getUIManagerFromLua(lua_State* L) {
+        lua_pushstring(L, UI_MANAGER_REGISTRY_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        auto* mgr = static_cast<UIManager*>(lua_touserdata(L, -1));
+        lua_pop(L, 1);
+        return mgr;
+    }
+
+    // 遞迴搜尋 UIContainer 樹
+    UIElement* findInTreeByName(UIContainer& root, const std::string& name) {
+        if (root.getName() == name) return &root;
+        for (const auto& child : root.getChildren()) {
+            if (!child) continue;
+            if (child->getName() == name) return child.get();
+            if (auto* container = dynamic_cast<UIContainer*>(child.get())) {
+                if (auto* found = findInTreeByName(*container, name)) {
+                    return found;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    UIElement* findInTreeByID(UIContainer& root, uint64_t id) {
+        if (root.getID().get() == id) return &root;
+        for (const auto& child : root.getChildren()) {
+            if (!child) continue;
+            if (child->getID().get() == id) return child.get();
+            if (auto* container = dynamic_cast<UIContainer*>(child.get())) {
+                if (auto* found = findInTreeByID(*container, id)) {
+                    return found;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    // 1. BindUIUpdate(elementPtr, function(self, dt) ... end)
+    int lua_BindUIUpdate(lua_State* L) {
+        auto* element = static_cast<UIElement*>(lua_touserdata(L, 1));
+        if (!element || !lua_isfunction(L, 2)) {
+            return luaL_error(L, "Invalid arguments to BindUIUpdate: expected (element, function)");
+        }
+        lua_pushvalue(L, 2);
+        element->setScriptUpdate(LuaRef::fromStack(L));
+        return 0;
+    }
+
+    // 2. UI_SetPosition(elementPtr, x, y)
+    int lua_UI_SetPosition(lua_State* L) {
+        auto* element = static_cast<UIElement*>(lua_touserdata(L, 1));
+        float x = static_cast<float>(luaL_checknumber(L, 2));
+        float y = static_cast<float>(luaL_checknumber(L, 3));
+        if (element) {
+            element->setPosition(x, y);
+        }
+        return 0;
+    }
+
+    // 3. FindUI("InGameConsole")
+    int lua_FindUI(lua_State* L) {
+        const char* name = luaL_checkstring(L, 1);
+        UIManager* mgr = getUIManagerFromLua(L);
+        UIElement* elem = (mgr && name) ? mgr->findElementByName(name) : nullptr;
+        if (elem) {
+            lua_pushlightuserdata(L, elem);
+        } else {
+            lua_pushnil(L);
+        }
+        return 1;
+    }
+
+    // 4. GetUIByUUID(id)
+    int lua_GetUIByUUID(lua_State* L) {
+        uint64_t id = static_cast<uint64_t>(luaL_checkinteger(L, 1));
+        UIManager* mgr = getUIManagerFromLua(L);
+        UIElement* elem = mgr ? mgr->findElementByID(id) : nullptr;
+        if (elem) {
+            lua_pushlightuserdata(L, elem);
+        } else {
+            lua_pushnil(L);
+        }
+        return 1;
+    }
+
+    // 5. UI_GetUUID(elementPtr)
+    int lua_UI_GetUUID(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        if (elem) {
+            lua_pushinteger(L, static_cast<lua_Integer>(elem->getID().get()));
+        } else {
+            lua_pushnil(L);
+        }
+        return 1;
+    }
+
+    // 6. UI_GetName(elementPtr)
+    int lua_UI_GetName(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        if (elem) {
+            lua_pushstring(L, elem->getName().c_str());
+        } else {
+            lua_pushnil(L);
+        }
+        return 1;
+    }
+
+    // 7. UI_SetVisible(elementPtr, visible)
+    int lua_UI_SetVisible(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        bool visible = lua_toboolean(L, 2) != 0;
+        if (elem) {
+            elem->setVisible(visible);
+        }
+        return 0;
+    }
+
+    // 8. UI_GetX(elem)
+    int lua_UI_GetX(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        lua_pushnumber(L, static_cast<lua_Number>(elem ? elem->getX() : 0.0f));
+        return 1;
+    }
+
+    // 9. UI_GetY(elem)
+    int lua_UI_GetY(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        lua_pushnumber(L, static_cast<lua_Number>(elem ? elem->getY() : 0.0f));
+        return 1;
+    }
+
+    // 10. UI_IsDragging(elem)
+    int lua_UI_IsDragging(lua_State* L) {
+        auto* win = dynamic_cast<UIWindow*>(static_cast<UIElement*>(lua_touserdata(L, 1)));
+        lua_pushboolean(L, (win && win->isDragging()) ? 1 : 0);
+        return 1;
+    }
+
+    // 11. CreateButton(x, y, w, h, text)
+    int lua_CreateButton(lua_State* L) {
+        float x = static_cast<float>(luaL_checknumber(L, 1));
+        float y = static_cast<float>(luaL_checknumber(L, 2));
+        float w = static_cast<float>(luaL_checknumber(L, 3));
+        float h = static_cast<float>(luaL_checknumber(L, 4));
+        const char* text = luaL_optstring(L, 5, "");
+
+        UIManager* mgr = getUIManagerFromLua(L);
+        UIElement* btn = mgr ? mgr->createButton(x, y, w, h, text ? text : "") : nullptr;
+        if (btn) {
+            lua_pushlightuserdata(L, btn);
+        } else {
+            lua_pushnil(L);
+        }
+        return 1;
+    }
+
+    // 12. SetPositionPercent(elem, xPercent, yPercent)
+    int lua_UI_SetPositionPercent(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        float x = static_cast<float>(luaL_checknumber(L, 2));
+        float y = static_cast<float>(luaL_checknumber(L, 3));
+        if (elem) {
+            elem->setPositionPercent(x, y);
+        }
+        return 0;
+    }
+}
 
 UIManager::UIManager(Shader& uiShader,
                      EventBus& eventBus,
@@ -8,12 +187,11 @@ UIManager::UIManager(Shader& uiShader,
                      LoggerSystem& logger,
                      IResourceManager& resources,
                      float screenWidth, float screenHeight)
-: m_renderer(uiShader, screenWidth, screenHeight),
-m_eventBus(eventBus),
-m_resources(resources),
-m_screenWidth(screenWidth),
-m_screenHeight(screenHeight) {
-
+                         : m_renderer(uiShader, screenWidth, screenHeight),
+                           m_eventBus(eventBus),
+                           m_resources(resources),
+                           m_screenWidth(screenWidth),
+                           m_screenHeight(screenHeight) {
     m_rootUI.setPosition(0.0f, 0.0f);
     m_rootUI.setSize(screenWidth, screenHeight);
     m_rootUI.setPassThrough(true);
@@ -24,7 +202,7 @@ m_screenHeight(screenHeight) {
         screenWidth, screenHeight,
         m_resources, m_eventBus
     );
-	
+
     // 2. 掛載 Console
     m_console = m_rootUI.emplaceChild<UIConsole>(
         0.0f, 0.0f, screenWidth, screenHeight,
@@ -46,6 +224,12 @@ m_screenHeight(screenHeight) {
     );
 
     bindEvents();
+    registerScriptBindings();
+}
+
+UIManager::~UIManager() {
+    m_eventBus.unsubscribeByOwner(getID());
+    unregisterScriptBindings();
 }
 
 void UIManager::toggleSettingsMenu() {
@@ -115,7 +299,7 @@ void UIManager::bindEvents() {
     m_eventBus.subscribe<MouseMovedEvent>([this](MouseMovedEvent& e) {
         // 先由頂層全域 UI 處理 (若 Console 打開且滑鼠在其上，會攔截)
         bool handled = m_rootUI.handleMouseMove(e.x, e.y);
-        
+
         // 若全域 UI 沒攔截 (例如 Console 隱藏或滑鼠在 Console 外)，再交給場景 UI
         if (!handled && m_activeSceneUI && m_activeSceneUI->isVisible()) {
             m_activeSceneUI->handleMouseMove(e.x, e.y);
@@ -194,4 +378,55 @@ void UIManager::render() {
     m_rootUI.render(m_renderer);
 
     m_renderer.end();
+}
+
+void UIManager::registerScriptBindings() {
+    m_eventBus.publish(RegisterScriptBindingEvent{
+        getID(),
+                       UI_MANAGER_REGISTRY_KEY,
+                       this,
+                       {
+                           { "BindUIUpdate",       lua_BindUIUpdate },
+                           { "UI_SetPosition",     lua_UI_SetPosition },
+                           { "FindUI",             lua_FindUI },
+                           { "GetUIByUUID",        lua_GetUIByUUID },
+                           { "UI_GetUUID",         lua_UI_GetUUID },
+                           { "UI_GetName",         lua_UI_GetName },
+                           { "UI_SetVisible",      lua_UI_SetVisible },
+                           { "UI_GetX",            lua_UI_GetX },
+                           { "UI_GetY",            lua_UI_GetY },
+                           { "UI_IsDragging",      lua_UI_IsDragging },
+                           { "CreateButton",       lua_CreateButton },
+                           { "SetPositionPercent", lua_UI_SetPositionPercent }
+                       }
+    });
+}
+
+void UIManager::unregisterScriptBindings() {
+    m_eventBus.publish(UnregisterScriptBindingEvent{
+        getID()
+    });
+}
+
+UIElement* UIManager::findElementByName(const std::string& name) {
+    if (m_activeSceneUI) {
+        if (auto* found = findInTreeByName(*m_activeSceneUI, name)) return found;
+    }
+    return findInTreeByName(m_rootUI, name);
+}
+
+UIElement* UIManager::findElementByID(uint64_t id) {
+    if (m_activeSceneUI) {
+        if (auto* found = findInTreeByID(*m_activeSceneUI, id)) return found;
+    }
+    return findInTreeByID(m_rootUI, id);
+}
+
+UIElement* UIManager::createButton(float x, float y, float w, float h, const std::string& text) {
+    UIContainer* target = m_activeSceneUI ? m_activeSceneUI.get() : &m_rootUI;
+    UIButton* btn = target->emplaceChild<UIButton>(x, y, w, h);
+    if (btn && !text.empty()) {
+        btn->setLabel(m_resources, EncodingUtils::utf8ToUtf32(text));
+    }
+    return btn;
 }

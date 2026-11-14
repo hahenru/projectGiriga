@@ -45,7 +45,7 @@ public:
 
     // 像素座標與大小設定
     void setPosition(float x, float y);
-    void setSize(float width, float height);
+    virtual void setSize(float width, float height);
 
     // 百分比座標與大小設定 (精確支援小數點如 0.01f 代表 0.01%)
     void setPositionPercent(float xPercent, float yPercent);

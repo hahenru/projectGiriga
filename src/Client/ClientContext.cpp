@@ -12,10 +12,10 @@ ClientContext::ClientContext(int width, int height, const std::string& title)
     logger->info("[ClientContext] OpenGL 驅動函式載入 (GLAD) 完成。");
 
     // 初始化客戶端音訊、輸入、網路與實體資源管理器
-    audio = std::make_unique<AudioSystem>();
+    audio = std::make_unique<AudioSystem>(*eventBus);
     keyboard = std::make_unique<KeyboardSystem>(*eventBus);
     enetCtx = std::make_unique<ENetContext>();
-    network = std::make_unique<ENetNode>(*logger); // 若 ENetNode 無參數就寫 std::make_unique<ENetNode>()
+    network = std::make_unique<ENetNode>(*logger);
     clientResources = std::make_unique<ClientResourceManager>(*logger);
 
     // ★ 關鍵：將衍生類別的實體指針掛給基底的抽象指針

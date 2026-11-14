@@ -16,8 +16,8 @@ public:
     CoreContext(const CoreContext&) = delete;
     CoreContext& operator=(const CoreContext&) = delete;
 
-    std::unique_ptr<LoggerSystem> logger;
     std::unique_ptr<EventBus> eventBus;
+    std::unique_ptr<LoggerSystem> logger;
     std::unique_ptr<ScriptEngine> scriptEngine;
     std::unique_ptr<ConsoleSystem> console;
     std::unique_ptr<SettingsRegistry> settings;

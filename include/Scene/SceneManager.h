@@ -3,17 +3,25 @@
 
 #include <memory>
 #include <functional>
-#include <Scene/Scene.h>
+#include <string>
+#include <Core/Identifiable.h>
 #include <Core/CoreContext.h>
+#include <Scene/Scene.h>
 #include <Event/EventBus.h>
 
-class SceneManager {
+class SceneManager : public Identifiable {
 public:
-    explicit SceneManager(CoreContext& ctx) : m_ctx(ctx) {}
-    ~SceneManager();
+	explicit SceneManager(CoreContext& ctx);
+	~SceneManager() override;
 
-    void update(float dt);
-    void applyPendingScene();
+	SceneManager(const SceneManager&) = delete;
+	SceneManager& operator=(const SceneManager&) = delete;
+
+	void update(float dt);
+	void applyPendingScene();
+
+	// 供 Lua 腳本或字串指令呼叫的便利介面（切換至指定腳本資源的 LuaScene）
+	void switchToLuaScene(const std::string& scriptResourceName);
 
 	template<typename T, typename... Args>
 	void switchScene(Args&&... args) {
@@ -31,12 +39,15 @@ public:
 		};
 	}
 
-    Scene* getCurrentScene() const { return m_currentScene.get(); }
+	Scene* getCurrentScene() const { return m_currentScene.get(); }
 
 private:
-    CoreContext& m_ctx;
-    std::unique_ptr<Scene> m_currentScene;
-    std::function<void()> m_pendingSceneFactory;
+	void registerScriptBindings();
+	void unregisterScriptBindings();
+
+	CoreContext& m_ctx;
+	std::unique_ptr<Scene> m_currentScene;
+	std::function<void()> m_pendingSceneFactory;
 };
 
 #endif // GIRIGARA_SCENE_SCENE_MANAGER_H

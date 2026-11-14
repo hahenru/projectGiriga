@@ -79,9 +79,9 @@ public:
 				 std::string fontName = "default")
 		: UIContainer(x, y, width, height),
 		  m_resources(resources),
+		  m_fontName(std::move(fontName)),
 		  m_eventBus(eventBus),
-		  m_fontSize(fontSize),
-		  m_fontName(std::move(fontName)) {
+		  m_fontSize(fontSize) {
 		
 		m_textLabel = emplaceChild<UIText>(
 			6.0f, (height - static_cast<float>(fontSize)) * 0.5f,
@@ -101,6 +101,24 @@ public:
     }
 
     const std::string& getText() const { return m_text; }
+
+    void setFontSize(unsigned int fontSize) {
+        if (m_fontSize == fontSize) return;
+        m_fontSize = fontSize;
+        if (m_textLabel) {
+            m_textLabel->setFontSize(m_fontSize);
+            m_textLabel->setPosition(6.0f, (getHeight() - static_cast<float>(m_fontSize)) * 0.5f);
+        }
+    }
+
+    unsigned int getFontSize() const { return m_fontSize; }
+
+    void setSize(float width, float height) override {
+        UIContainer::setSize(width, height);
+        if (m_textLabel) {
+            m_textLabel->setPosition(6.0f, (height - static_cast<float>(m_fontSize)) * 0.5f);
+        }
+    }
 
     void update(float dt) override {
         UIContainer::update(dt);

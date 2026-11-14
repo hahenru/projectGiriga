@@ -30,6 +30,10 @@
 - **音訊系統**
   - 現在可以載入音訊了，遊戲可能還做不太到，但是做出一個撥放器已經綽綽有餘了
   - 原生支援多軌音訊介面(在linux下)
+- **分離式架構**
+  - 資料計算和UI是分開的兩個線程，走網路通訊的。
+  - 資料計算部份可以單獨分離。
+  - 這是一個網路原生的遊戲引擎
 
 ---
 
@@ -39,16 +43,16 @@
 
 不過到了那個時候，我得把 Engine 和 Runtime 徹底分開，這恐怕會很麻煩……所以就如上述，是**「有機會」**而非保證。
 
-以下是近期目標:
-一個正常的場景轉場
-加入sqlite的支援還有某種zip的解決方案，和一些額外的添加物，為了增添風味。
-圖片載入的功能，但不是libpng、libjpg，他不夠全能。
-glm或是其他數學庫
+以下是近期目標：
+- 一個正常的場景轉場
+- 加入 SQLite 的支援還有某種 ZIP 的解決方案，和一些額外的添加物，為了增添風味。
+- 圖片載入的功能，但不是 libpng、libjpg，它不夠全能。
+- glm 或是其他數學庫
 
-以下是遠期目標:
-https和websocket支持。
-使用ENet+Asio+libcurl的組合。
-Engine, Runtime separate.
+以下是遠期目標：
+- HTTPS 和 WebSocket 支持。
+- 使用 ENet + Asio + libcurl 的組合。
+- Engine, Runtime 徹底分離。
 
 ---
 
@@ -58,22 +62,33 @@ Engine, Runtime separate.
 專案採用 Makefile 管理編譯，支援 GCC CLI 工具鏈：
 
 ```bash
-# 編譯並建置專案
+# 僅編譯並打包 Linux 客戶端
 make linux
 
-# 執行
-./build/Girigara
-```
+# 僅編譯無頭伺服器 (Headless Server)
+make server
+
+# 在 Linux 上透過 MinGW-w64 交叉編譯並打包 Windows 64-bit 版本
+make win64
+
+# 一次建置全部目標 (Linux + Windows 交叉編譯 + Flatpak)
+make all
+
+# 執行客戶端
+./build/projectGIRIGARA
 
 一點額外事項，在這個版本中，我修改了makefile，所以我想之後你應該可以直接在windows編譯了，不過依賴的部分你得自己編譯，然後放到環境變數中CPATH和LIBRARY_PATH所在的位置。
 或是我想你的包管理器可以替你完成這件事情，以下是使用的host是Windows 11 + mingw-w64
 
 ```bash
-# 編譯並建置專案
+# 編譯並打包 Windows 原生客戶端
 make
 
-# 執行
-.\build\Girigara
+# 編譯無頭伺服器
+make win64-native-server
+
+# 執行客戶端
+.\build\win64_native\projectGIRIGARA.exe
 ```
 
 對，就這麼簡單，我做了點判斷，現在他會看你的電腦是Windows嗎?但我沒考慮過都不是的部分。還請見諒。
@@ -91,7 +106,7 @@ make
 | **GLFW** | 3.5.1 | 視窗建立、輸入事件監聽與 Context 管理 | `-lglfw` / `-lglfw3` |
 | **FreeType 2** | 2.15.0 | 向量字型載入與動態點陣圖烘焙 | `pkg-config --libs freetype2` / `-lfreetype` |
 | **Lua** | 5.5.1 | 腳本引擎與 In-Game REPL 執行環境 | `-llua` |
-| **ENet** | After 1.3.18 Commit 5a9c537 | 低延遲遊戲網路庫 | |
+| **ENet** | After 1.3.18 Commit 5a9c537 | 低延遲遊戲網路庫 | `-lenet` (Win: `-lenet -lws2_32`) |
 | **ALSA** *(Linux 專用)* | 最新版 | 底層音訊後端支援 | `-lasound` |
 | **miniaudio** | 0.11.26 | 單一標頭檔音訊引擎（已內建實作包裝於專案中） | 需放置於 include 路徑 |
 | **GLAD** | 4.6 Core | OpenGL Function Loader | 原始碼已內建於 `src/glad.c` |

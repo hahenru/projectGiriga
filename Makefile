@@ -16,16 +16,18 @@ endif
 # ==========================================
 # 1. 雙端共用核心 (Common)
 COMMON_SRC = \
+    src/LoggerSystem.cpp \
     src/Core/CoreContext.cpp \
     src/Network/ENetNode.cpp \
-	src/Scene.cpp \
+    src/Scene.cpp \
     src/SceneManager.cpp \
     src/LuaScene.cpp \
     src/ScriptEngine.cpp \
     src/ScriptResource.cpp \
+    src/SettingsRegistry.cpp \
     src/ConsoleSystem.cpp \
-	src/Girigara.cpp \
-	src/main.cpp
+    src/Girigara.cpp \
+    src/main.cpp
 
 # 2. 客戶端專屬 (Client)
 CLIENT_SRC = \
@@ -56,12 +58,12 @@ CLIENT_SRC = \
     src/UIPanel.cpp \
     src/UIHorizontalLayout.cpp \
     src/UISettingsMenu.cpp \
-	src/Client/ClientRuntime.cpp
+    src/Client/ClientRuntime.cpp
 
 SERVER_SRC = \
     src/Server/ServerContext.cpp \
     src/Server/ServerResourceManager.cpp \
-	src/Server/ServerRuntime.cpp
+    src/Server/ServerRuntime.cpp
     # src/Server/ServerApp.cpp \
     # src/Server/server_main.cpp
 

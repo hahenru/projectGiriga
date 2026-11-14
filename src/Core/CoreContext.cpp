@@ -1,11 +1,11 @@
 #include <Core/CoreContext.h>
 
 CoreContext::CoreContext()
-    : logger(std::make_unique<LoggerSystem>(65535)),
-      eventBus(std::make_unique<EventBus>()),
+    : eventBus(std::make_unique<EventBus>()),
+      logger(std::make_unique<LoggerSystem>(*eventBus, 65535)),
       scriptEngine(std::make_unique<ScriptEngine>(*eventBus)),
       console(std::make_unique<ConsoleSystem>(*logger)),
-      settings(std::make_unique<SettingsRegistry>(*logger)) {
+      settings(std::make_unique<SettingsRegistry>(*eventBus, *logger)) {
 
     console->setScriptEngine(scriptEngine.get());
 
@@ -13,13 +13,13 @@ CoreContext::CoreContext()
 }
 
 CoreContext::~CoreContext() {
-    // 逆序釋放純邏輯子系統
+    // 逆序釋放純邏輯子系統（EventBus 必須留到最後銷毀）
     console.reset();
-    scriptEngine.reset();
     settings.reset();
-    eventBus.reset();
     if (logger) {
         logger->info("[CoreContext] 核心子系統已釋放。");
         logger.reset();
     }
+    scriptEngine.reset();
+    eventBus.reset();
 }

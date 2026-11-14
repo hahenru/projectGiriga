@@ -1,6 +1,7 @@
 #ifndef GIRIGARA_UI_UI_MANAGER_H
 #define GIRIGARA_UI_UI_MANAGER_H
 
+#include <Core/Identifiable.h>
 #include <UI/UIContainer.h>
 #include <UI/UIConsole.h>
 #include <UI/UISettingsMenu.h>
@@ -13,6 +14,8 @@
 #include <System/LoggerSystem.h>
 #include <memory>
 #include <vector>
+#include <string>
+#include <cstdint>
 
 struct DyingUIEntry {
     std::unique_ptr<UIContainer> tree;
@@ -20,17 +23,17 @@ struct DyingUIEntry {
     float maxLifetime = 0.25f;
 };
 
-class UIManager {
+class UIManager : public Identifiable {
 public:
-	UIManager(Shader& uiShader,
-		EventBus& eventBus,
-		KeyboardSystem& keyboard,
-		ConsoleSystem& console,
-		LoggerSystem& logger,
-		IResourceManager& resources,
-		float screenWidth, float screenHeight);
+    UIManager(Shader& uiShader,
+              EventBus& eventBus,
+              KeyboardSystem& keyboard,
+              ConsoleSystem& console,
+              LoggerSystem& logger,
+              IResourceManager& resources,
+              float screenWidth, float screenHeight);
 
-    ~UIManager() = default;
+    ~UIManager() override;
 
     UIManager(const UIManager&) = delete;
     UIManager& operator=(const UIManager&) = delete;
@@ -40,12 +43,19 @@ public:
     UIConsole* getConsole() { return m_console; }
     UIContainer& getRootUI() { return m_rootUI; }
 
+    // 樹狀節點查詢與動態建立（供 C++ 與 Lua 腳本共用）
+    UIElement* findElementByName(const std::string& name);
+    UIElement* findElementByID(uint64_t id);
+    UIElement* createButton(float x, float y, float w, float h, const std::string& text);
+
     void onWindowResize(float width, float height);
     void update(float dt);
     void render();
 
 private:
     void bindEvents();
+    void registerScriptBindings();
+    void unregisterScriptBindings();
 
     UIRenderer m_renderer;
     EventBus& m_eventBus;

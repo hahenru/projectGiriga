@@ -1,14 +1,19 @@
 #ifndef GIRIGARA_AUDIO_AUDIO_SYSTEM_H
 #define GIRIGARA_AUDIO_AUDIO_SYSTEM_H
 
+#include <Core/Identifiable.h>
+#include <Event/EventBus.h>
 #include <string>
 #include <memory>
 #include <miniaudio.h>
 
-class AudioSystem {
+class AudioSystem : public Identifiable {
 public:
-    AudioSystem();
-    ~AudioSystem();
+    explicit AudioSystem(EventBus& eventBus);
+    ~AudioSystem() override;
+
+    AudioSystem(const AudioSystem&) = delete;
+    AudioSystem& operator=(const AudioSystem&) = delete;
 
     // 播放背景音樂（支援循環）
     void playBGM(const std::string& filePath, bool loop = true);
@@ -18,6 +23,10 @@ public:
     void playSFX(const std::string& filePath);
 
 private:
+    void registerScriptBindings();
+    void unregisterScriptBindings();
+
+    EventBus& m_eventBus;
     ma_engine m_engine;
     ma_sound m_bgm;
     bool m_bgmLoaded{false};
