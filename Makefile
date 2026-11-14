@@ -51,6 +51,7 @@ CLIENT_SRC = \
     src/UISlantedLayout.cpp \
     src/UIRenderer.cpp \
     src/UIManager.cpp \
+    src/UIFactory.cpp\
     src/FontResource.cpp \
     src/AudioResource.cpp \
     src/miniaudio_impl.cpp \

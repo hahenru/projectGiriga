@@ -3,11 +3,11 @@
 
 #include <Core/Identifiable.h>
 #include <UI/UIContainer.h>
+#include <UI/UIFactory.h>
 #include <UI/UIConsole.h>
 #include <UI/UISettingsMenu.h>
 #include <Renderer/UIRenderer.h>
 #include <Resource/IResourceManager.h>
-#include <Font/FontLoader.h>
 #include <Event/EventBus.h>
 #include <System/KeyboardSystem.h>
 #include <System/ConsoleSystem.h>
@@ -42,11 +42,12 @@ public:
     void toggleSettingsMenu();
     UIConsole* getConsole() { return m_console; }
     UIContainer& getRootUI() { return m_rootUI; }
+    UIFactory& getFactory() { return m_factory; }
 
-    // 樹狀節點查詢與動態建立（供 C++ 與 Lua 腳本共用）
+    // 樹狀節點查詢與通用工廠建立（完全解耦具體控制項）
     UIElement* findElementByName(const std::string& name);
     UIElement* findElementByID(uint64_t id);
-    UIElement* createButton(float x, float y, float w, float h, const std::string& text);
+    UIElement* createElement(const std::string& typeName, const UIPropMap& props = {}, UIContainer* parent = nullptr);
 
     void onWindowResize(float width, float height);
     void update(float dt);
@@ -60,6 +61,7 @@ private:
     UIRenderer m_renderer;
     EventBus& m_eventBus;
     IResourceManager& m_resources;
+    UIFactory m_factory;
 
     // 三棵樹
     UIContainer m_rootUI;                                   // 1) 全局持久層 (Console, Toast 等)

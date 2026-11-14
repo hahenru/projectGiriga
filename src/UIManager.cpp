@@ -1,7 +1,5 @@
 #include <UI/UIManager.h>
 #include <UI/UIWindow.h>
-#include <UI/UIButton.h>
-#include <UI/UIRegistry.h>
 #include <Event/Event.h>
 
 extern "C" {
@@ -150,24 +148,6 @@ namespace {
         return 1;
     }
 
-    // 11. CreateButton(x, y, w, h, text)
-    int lua_CreateButton(lua_State* L) {
-        float x = static_cast<float>(luaL_checknumber(L, 1));
-        float y = static_cast<float>(luaL_checknumber(L, 2));
-        float w = static_cast<float>(luaL_checknumber(L, 3));
-        float h = static_cast<float>(luaL_checknumber(L, 4));
-        const char* text = luaL_optstring(L, 5, "");
-
-        UIManager* mgr = getUIManagerFromLua(L);
-        UIElement* btn = mgr ? mgr->createButton(x, y, w, h, text ? text : "") : nullptr;
-        if (btn) {
-            lua_pushlightuserdata(L, btn);
-        } else {
-            lua_pushnil(L);
-        }
-        return 1;
-    }
-
     // 12. SetPositionPercent(elem, xPercent, yPercent)
     int lua_UI_SetPositionPercent(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
@@ -177,6 +157,45 @@ namespace {
             elem->setPositionPercent(x, y);
         }
         return 0;
+    }
+
+    UIPropMap parsePropMapFromLuaTable(lua_State* L, int tableIdx) {
+        UIPropMap props;
+        if (!lua_istable(L, tableIdx)) return props;
+
+        lua_pushnil(L);
+        while (lua_next(L, tableIdx) != 0) {
+            if (lua_type(L, -2) == LUA_TSTRING) {
+                std::string key = lua_tostring(L, -2);
+                if (lua_isboolean(L, -1)) {
+                    props[key] = (lua_toboolean(L, -1) != 0);
+                } else if (lua_isinteger(L, -1)) {
+                    props[key] = static_cast<int>(lua_tointeger(L, -1));
+                } else if (lua_isnumber(L, -1)) {
+                    props[key] = static_cast<float>(lua_tonumber(L, -1));
+                } else if (lua_isstring(L, -1)) {
+                    props[key] = std::string(lua_tostring(L, -1));
+                }
+            }
+            lua_pop(L, 1);
+        }
+        return props;
+    }
+
+    // CreateUI("Button", { x = 100, y = 200, w = 160, h = 40, text = "Start" })
+    int lua_CreateUI(lua_State* L) {
+        const char* typeName = luaL_checkstring(L, 1);
+        UIPropMap props = (lua_gettop(L) >= 2) ? parsePropMapFromLuaTable(L, 2) : UIPropMap{};
+        auto* parent = (lua_gettop(L) >= 3) ? dynamic_cast<UIContainer*>(static_cast<UIElement*>(lua_touserdata(L, 3))) : nullptr;
+
+        UIManager* mgr = getUIManagerFromLua(L);
+        UIElement* elem = (mgr && typeName) ? mgr->createElement(typeName, props, parent) : nullptr;
+        if (elem) {
+            lua_pushlightuserdata(L, elem);
+        } else {
+            lua_pushnil(L);
+        }
+        return 1;
     }
 }
 
@@ -225,6 +244,7 @@ UIManager::UIManager(Shader& uiShader,
 
     bindEvents();
     registerScriptBindings();
+    m_factory.registerBuiltinTypes();
 }
 
 UIManager::~UIManager() {
@@ -288,12 +308,12 @@ void UIManager::bindEvents() {
             m_activeSceneUI->setSize(m_screenWidth, m_screenHeight);
             m_activeSceneUI->setPassThrough(true); // 場景根容器也是穿透的
         }
-    });
+    }, getID());
 
     // B. 視窗縮放事件
     m_eventBus.subscribe<WindowResizeEvent>([this](WindowResizeEvent& e) {
         onWindowResize(static_cast<float>(e.width), static_cast<float>(e.height));
-    });
+    }, getID());
 
     // C. ★ 關鍵修正：滑鼠移動事件派發 (用於按鈕 Hover 更新)
     m_eventBus.subscribe<MouseMovedEvent>([this](MouseMovedEvent& e) {
@@ -304,7 +324,7 @@ void UIManager::bindEvents() {
         if (!handled && m_activeSceneUI && m_activeSceneUI->isVisible()) {
             m_activeSceneUI->handleMouseMove(e.x, e.y);
         }
-    });
+    }, getID());
 
     // D. ★ 關鍵修正：滑鼠點擊事件派發 (用於按鈕 Click 與輸入框 Focus)
     m_eventBus.subscribePriority<MouseButtonEvent>([this](MouseButtonEvent& e) {
@@ -320,7 +340,7 @@ void UIManager::bindEvents() {
                 e.isHandled = true;
             }
         }
-    });
+    }, getID());
 }
 
 void UIManager::toggleConsole() {
@@ -396,8 +416,8 @@ void UIManager::registerScriptBindings() {
                            { "UI_GetX",            lua_UI_GetX },
                            { "UI_GetY",            lua_UI_GetY },
                            { "UI_IsDragging",      lua_UI_IsDragging },
-                           { "CreateButton",       lua_CreateButton },
-                           { "SetPositionPercent", lua_UI_SetPositionPercent }
+                           { "SetPositionPercent", lua_UI_SetPositionPercent },
+                           { "CreateUI", lua_CreateUI }
                        }
     });
 }
@@ -422,11 +442,17 @@ UIElement* UIManager::findElementByID(uint64_t id) {
     return findInTreeByID(m_rootUI, id);
 }
 
-UIElement* UIManager::createButton(float x, float y, float w, float h, const std::string& text) {
-    UIContainer* target = m_activeSceneUI ? m_activeSceneUI.get() : &m_rootUI;
-    UIButton* btn = target->emplaceChild<UIButton>(x, y, w, h);
-    if (btn && !text.empty()) {
-        btn->setLabel(m_resources, EncodingUtils::utf8ToUtf32(text));
+UIElement* UIManager::createElement(const std::string& typeName, const UIPropMap& props, UIContainer* parent) {
+    UIBuildContext ctx{ m_resources, m_eventBus };
+    auto elem = m_factory.create(typeName, ctx, props);
+    if (!elem) return nullptr;
+
+    if (auto name = UIFactory::getString(props, "name"); !name.empty()) {
+        elem->setName(name);
     }
-    return btn;
+
+    UIElement* rawPtr = elem.get();
+    UIContainer* target = parent ? parent : (m_activeSceneUI ? m_activeSceneUI.get() : &m_rootUI);
+    target->addChild(std::move(elem));
+    return rawPtr;
 }
