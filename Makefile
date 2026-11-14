@@ -4,105 +4,89 @@
 ifeq ($(OS),Windows_NT)
     HOST_OS = Windows
     DEFAULT_GOAL = win64-native
+    TREE_CMD = tree . /f > a.txt
 else
     HOST_OS = Linux
     DEFAULT_GOAL = all
+    TREE_CMD = tree -a > a.txt
 endif
 
 .DEFAULT_GOAL := $(DEFAULT_GOAL)
 
 # ==========================================
-# 原始碼分類 (嚴格依據目錄結構分流)
+# 原始碼分類 (嚴格依據目錄結構分流，1:1 對齊 include/)
 # ==========================================
 # 1. 三端共用核心 (Common - 零網路、零音訊、零視窗依賴)
 COMMON_SRC = \
-    src/LoggerSystem.cpp \
-    src/Core/CoreContext.cpp \
-    src/Scene.cpp \
-    src/SceneManager.cpp \
-    src/LuaScene.cpp \
-    src/ScriptEngine.cpp \
-    src/ScriptResource.cpp \
-    src/ConsoleSystem.cpp \
-    src/GpkArchive.cpp \
-    src/Girigara.cpp \
-    src/main.cpp
+	src/Core/CoreContext.cpp \
+	src/System/LoggerSystem.cpp \
+	src/System/ConsoleSystem.cpp \
+	src/Scene/Scene.cpp \
+	src/Scene/SceneManager.cpp \
+	src/Scene/LuaScene.cpp \
+	src/Script/ScriptEngine.cpp \
+	src/Resource/ScriptResource.cpp \
+	src/Resource/GpkArchive.cpp \
+	src/Girigara.cpp \
+	src/main.cpp
 
 # 2. 網路模組 (Net - 供 Client 與 Server 共用，Tool 不編譯)
 NET_SRC = \
-    src/Network/ENetNode.cpp
+	src/Network/ENetNode.cpp
 
-# 2. 客戶端專屬 (Client)
+# 3. 圖形與介面共用層 (GUI Common - 供 Client 與 Tool 共用，Server 不編譯)
+GUI_COMMON_SRC = \
+	src/glad/glad.c \
+	src/Shader/Shader.cpp \
+	src/Window/WindowManager.cpp \
+	src/System/KeyboardSystem.cpp \
+	src/Font/FontLoader.cpp \
+	src/Resource/FontResource.cpp \
+	src/Resource/ImageResource.cpp \
+	src/ThirdParty/stb_image_impl.cpp \
+	src/Renderer/QuadMesh.cpp \
+	src/Renderer/UIRenderer.cpp \
+	src/UI/UIElement.cpp \
+	src/UI/UIContainer.cpp \
+	src/UI/UIPanel.cpp \
+	src/UI/UIButton.cpp \
+	src/UI/UIText.cpp \
+	src/UI/UIConsole.cpp \
+	src/UI/UIWindow.cpp \
+	src/UI/UIHorizontalLayout.cpp \
+	src/UI/UIVerticalLayout.cpp \
+	src/UI/UISlantedLayout.cpp \
+	src/UI/UIManager.cpp \
+	src/UI/UIFactory.cpp \
+	src/UI/UISettingsMenu.cpp
+
+# 4. 客戶端專屬 (Client - 遊戲場景、音訊系統、全域設定表)
 CLIENT_SRC = \
-    src/Client/ClientContext.cpp \
-    src/Client/ClientResourceManager.cpp \
-    src/Client/ClientRuntime.cpp \
-    src/ImageResource.cpp \
-    src/glad.c \
-    src/Shader.cpp \
-    src/WindowManager.cpp \
-    src/UIContainer.cpp \
-    src/UIElement.cpp \
-    src/UIButton.cpp \
-    src/UIText.cpp \
-    src/UIConsole.cpp \
-    src/QuadMesh.cpp \
-    src/UIWindow.cpp \
-    src/KeyboardSystem.cpp \
-    src/MainMenuScene.cpp \
-    src/GameScene.cpp \
-    src/FontLoader.cpp \
-    src/UIVerticalLayout.cpp \
-    src/UISlantedLayout.cpp \
-    src/UIRenderer.cpp \
-    src/UIManager.cpp \
-    src/UIFactory.cpp \
-    src/FontResource.cpp \
-    src/AudioResource.cpp \
-    src/miniaudio_impl.cpp \
-    src/stb_image_impl.cpp \
-    src/AudioSystem.cpp \
-    src/UIPanel.cpp \
-    src/UIHorizontalLayout.cpp \
-    src/SettingsRegistry.cpp \
-    src/UISettingsMenu.cpp
+	$(GUI_COMMON_SRC) \
+	src/Client/ClientContext.cpp \
+	src/Client/ClientResourceManager.cpp \
+	src/Client/ClientRuntime.cpp \
+	src/Scene/MainMenuScene.cpp \
+	src/Scene/GameScene.cpp \
+	src/Audio/AudioSystem.cpp \
+	src/Resource/AudioResource.cpp \
+	src/ThirdParty/miniaudio_impl.cpp \
+	src/System/SettingsRegistry.cpp
 
-# 3. 伺服器專屬 (Server)
+# 5. 伺服器專屬 (Server - 無頭伺服器與外部設定檔)
 SERVER_SRC = \
-    src/Server/ServerContext.cpp \
-    src/Server/ServerResourceManager.cpp \
-    src/Server/ServerRuntime.cpp \
-    src/Server/ServerConfig.cpp
+	src/Server/ServerContext.cpp \
+	src/Server/ServerResourceManager.cpp \
+	src/Server/ServerRuntime.cpp \
+	src/Server/ServerConfig.cpp
 
-# 4. 獨立工具專屬 (Tool - 零網路、零音訊)
+# 6. 獨立工具專屬 (Tool - 封包管理介面與 GPK Lua 綁定)
 TOOL_SRC = \
-    src/Tool/ToolContext.cpp \
-    src/Tool/ToolResourceManager.cpp \
-    src/Tool/ToolRuntime.cpp \
-    src/GpkScriptBinder.cpp \
-    src/ImageResource.cpp \
-    src/glad.c \
-    src/Shader.cpp \
-    src/WindowManager.cpp \
-    src/UIContainer.cpp \
-    src/UIElement.cpp \
-    src/UIButton.cpp \
-    src/UIText.cpp \
-    src/UIConsole.cpp \
-    src/QuadMesh.cpp \
-    src/UIWindow.cpp \
-    src/KeyboardSystem.cpp \
-    src/FontLoader.cpp \
-    src/UIVerticalLayout.cpp \
-    src/UISlantedLayout.cpp \
-    src/UIRenderer.cpp \
-    src/UIManager.cpp \
-    src/UIFactory.cpp \
-    src/FontResource.cpp \
-    src/stb_image_impl.cpp \
-    src/UIPanel.cpp \
-    src/UIHorizontalLayout.cpp \
-    src/UISettingsMenu.cpp
+	$(GUI_COMMON_SRC) \
+	src/Tool/ToolContext.cpp \
+	src/Tool/ToolResourceManager.cpp \
+	src/Tool/ToolRuntime.cpp \
+	src/Script/GpkScriptBinder.cpp
 
 # 預設整合版 Client（含本機伺服器能力）
 ALL_CLIENT_SRC      = $(COMMON_SRC) $(NET_SRC) $(CLIENT_SRC) $(SERVER_SRC)
@@ -384,7 +368,7 @@ endif
 -include $(DEPS)
 
 tree:
-	tree . /f
+	$(TREE_CMD)
 
 .PHONY: all linux-all linux server tool win64 win64-native win64-native-server \
         copy_assets_linux package_linux copy_assets_win package_win \
