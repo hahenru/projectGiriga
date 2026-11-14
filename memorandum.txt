@@ -1,8 +1,8 @@
-加入壓縮庫、資料庫、圖片載入器
-壓縮庫要壓縮腳本、圖片之類的資源
+優先項目： 實作packer_tool.lua讓工具可以有圖形化的打包
+
+加入資料庫
 資料庫要讀取Sqlite3，之後要實作資料庫加密函數
-圖片載入器
-用miniz、SQLite3、stb_image.h
+用SQLite3
 全都要整合到ResourceManager
 SQLite3視情況選擇是否要ORM，不一定要提供lua端的接口，那太難。
 要做右鍵選單
