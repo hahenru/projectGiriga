@@ -28,6 +28,8 @@ private:
     static int lua_GpkPackFiles(lua_State* L);
     static int lua_GpkList(lua_State* L);
     static int lua_GpkExtractAll(lua_State* L);
+    static int lua_OpenFolderDialog(lua_State* L);
+    static int lua_OpenFileDialog(lua_State* L);
 
     EventBus& m_eventBus;
     Depersonalization m_id;

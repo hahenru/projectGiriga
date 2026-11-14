@@ -177,4 +177,13 @@ public:
     RemoteSettingValue value;
 };
 
+// 視窗拖放檔案/資料夾事件
+class FileDropEvent : public Event {
+public:
+    explicit FileDropEvent(std::vector<std::string> paths)
+    : paths(std::move(paths)) {}
+
+    std::vector<std::string> paths;
+};
+
 #endif // GIRIGARA_EVENT_EVENT_H

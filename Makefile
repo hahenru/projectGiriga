@@ -4,11 +4,11 @@
 ifeq ($(OS),Windows_NT)
     HOST_OS = Windows
     DEFAULT_GOAL = win64-native
-    TREE_CMD = tree . /f > a.txt
+    TREE_CMD = tree . /f > tree.txt
 else
     HOST_OS = Linux
     DEFAULT_GOAL = all
-    TREE_CMD = tree -a > a.txt
+    TREE_CMD = tree -a > tree.txt
 endif
 
 .DEFAULT_GOAL := $(DEFAULT_GOAL)

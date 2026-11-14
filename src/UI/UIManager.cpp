@@ -1,3 +1,6 @@
+#include <UI/UIButton.h>
+#include <UI/UIInputField.h>
+#include <UI/UIText.h>
 #include <UI/UIManager.h>
 #include <UI/UIWindow.h>
 #include <Event/Event.h>
@@ -155,6 +158,66 @@ namespace {
         float y = static_cast<float>(luaL_checknumber(L, 3));
         if (elem) {
             elem->setPositionPercent(x, y);
+        }
+        return 0;
+    }
+
+    // 13. UI_OnClick(buttonPtr, function() ... end)
+    int lua_UI_OnClick(lua_State* L) {
+        auto* btn = dynamic_cast<UIButton*>(static_cast<UIElement*>(lua_touserdata(L, 1)));
+        if (!btn || !lua_isfunction(L, 2)) {
+            return luaL_error(L, "UI_OnClick expected (UIButton, function)");
+        }
+        lua_pushvalue(L, 2);
+        auto cbRef = std::make_shared<LuaRef>(LuaRef::fromStack(L));
+        btn->setOnClick([L, cbRef]() {
+            if (!cbRef->isValid()) return;
+            cbRef->push();
+            if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+                lua_pop(L, 1);
+            }
+        });
+        return 0;
+    }
+
+    // 14. UI_GetText(inputOrTextPtr) -> string
+    int lua_UI_GetText(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        if (auto* input = dynamic_cast<UIInputField*>(elem)) {
+            lua_pushstring(L, input->getText().c_str());
+        } else if (auto* txt = dynamic_cast<UIText*>(elem)) {
+            lua_pushstring(L, EncodingUtils::utf32ToUtf8(txt->getText()).c_str());
+        } else if (auto* btn = dynamic_cast<UIButton*>(elem); btn && btn->getLabel()) {
+            lua_pushstring(L, EncodingUtils::utf32ToUtf8(btn->getLabel()->getText()).c_str());
+        } else {
+            lua_pushstring(L, "");
+        }
+        return 1;
+    }
+
+    // 15. UI_SetText(inputOrTextOrBtnPtr, str)
+    int lua_UI_SetText(lua_State* L) {
+        auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
+        const char* str = luaL_checkstring(L, 2);
+        UIManager* mgr = getUIManagerFromLua(L);
+        if (!elem || !str) return 0;
+
+        if (auto* input = dynamic_cast<UIInputField*>(elem)) {
+            input->setText(str);
+        } else if (auto* txt = dynamic_cast<UIText*>(elem)) {
+            txt->setText(EncodingUtils::utf8ToUtf32(str));
+        } else if (auto* btn = dynamic_cast<UIButton*>(elem); btn && mgr) {
+            btn->setLabel(mgr->getResources(), EncodingUtils::utf8ToUtf32(str));
+        }
+        return 0;
+    }
+
+    // 16. UI_SetButtonLocked(buttonPtr, locked)
+    int lua_UI_SetButtonLocked(lua_State* L) {
+        auto* btn = dynamic_cast<UIButton*>(static_cast<UIElement*>(lua_touserdata(L, 1)));
+        bool locked = lua_toboolean(L, 2) != 0;
+        if (btn) {
+            btn->setLocked(locked);
         }
         return 0;
     }
@@ -417,7 +480,11 @@ void UIManager::registerScriptBindings() {
                            { "UI_GetY",            lua_UI_GetY },
                            { "UI_IsDragging",      lua_UI_IsDragging },
                            { "SetPositionPercent", lua_UI_SetPositionPercent },
-                           { "CreateUI", lua_CreateUI }
+                           { "CreateUI", lua_CreateUI },
+                           { "UI_OnClick",         lua_UI_OnClick },
+                           { "UI_GetText",         lua_UI_GetText },
+                           { "UI_SetText",         lua_UI_SetText },
+                           { "UI_SetButtonLocked", lua_UI_SetButtonLocked }
                        }
     });
 }
@@ -451,8 +518,24 @@ UIElement* UIManager::createElement(const std::string& typeName, const UIPropMap
         elem->setName(name);
     }
 
+    // ★ 新增：支援百分比座標與尺寸（例如 xPercent = 5.0, wPercent = 90.0）
+    if (props.contains("xPercent") || props.contains("yPercent")) {
+        elem->setPositionPercent(
+            UIFactory::getFloat(props, "xPercent", 0.0f),
+                                 UIFactory::getFloat(props, "yPercent", 0.0f)
+        );
+    }
+    if (props.contains("wPercent") || props.contains("hPercent")) {
+        elem->setSizePercent(
+            UIFactory::getFloat(props, "wPercent", 100.0f),
+                             UIFactory::getFloat(props, "hPercent", 100.0f)
+        );
+    }
+
     UIElement* rawPtr = elem.get();
     UIContainer* target = parent ? parent : (m_activeSceneUI ? m_activeSceneUI.get() : &m_rootUI);
     target->addChild(std::move(elem));
     return rawPtr;
 }
+
+

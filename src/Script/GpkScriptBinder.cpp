@@ -22,7 +22,9 @@ GpkScriptBinder::GpkScriptBinder(EventBus& eventBus)
             { "GpkPackDirectory", &GpkScriptBinder::lua_GpkPackDirectory },
             { "GpkPackFiles",     &GpkScriptBinder::lua_GpkPackFiles },
             { "GpkList",          &GpkScriptBinder::lua_GpkList },
-            { "GpkExtractAll",    &GpkScriptBinder::lua_GpkExtractAll }
+            { "GpkExtractAll",    &GpkScriptBinder::lua_GpkExtractAll },
+            { "OpenFolderDialog", &GpkScriptBinder::lua_OpenFolderDialog },
+            { "OpenFileDialog",   &GpkScriptBinder::lua_OpenFileDialog }
         }
     });
 }
@@ -265,4 +267,64 @@ int GpkScriptBinder::lua_GpkExtractAll(lua_State* L) {
     lua_pushboolean(L, 1);
     lua_pushstring(L, msg.c_str());
     return 2;
+}
+
+namespace {
+    std::string runDialogCommand(const std::string& cmd) {
+        std::string result;
+        #if defined(_WIN32)
+        FILE* pipe = _popen(cmd.c_str(), "r");
+        #else
+        FILE* pipe = popen(cmd.c_str(), "r");
+        #endif
+        if (!pipe) return result;
+        char buf[512];
+        while (fgets(buf, sizeof(buf), pipe)) {
+            result += buf;
+        }
+        #if defined(_WIN32)
+        _pclose(pipe);
+        #else
+        pclose(pipe);
+        #endif
+        while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+            result.pop_back();
+        }
+        return result;
+    }
+} // namespace
+
+int GpkScriptBinder::lua_OpenFolderDialog(lua_State* L) {
+    const char* title = luaL_optstring(L, 1, "選擇目標資料夾");
+    #if defined(_WIN32)
+    std::string cmd = "powershell -NoProfile -Command \"Add-Type -AssemblyName System.Windows.Forms; "
+    "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+    "$f.Description = '" + std::string(title) + "'; "
+    "if($f.ShowDialog() -eq 'OK'){ $f.SelectedPath }\"";
+    #else
+    std::string cmd = "zenity --file-selection --directory --title=\"" + std::string(title) +
+    "\" 2>/dev/null || kdialog --getexistingdirectory . --title \"" + std::string(title) + "\" 2>/dev/null";
+    #endif
+    std::string path = runDialogCommand(cmd);
+    if (path.empty()) lua_pushnil(L);
+    else lua_pushstring(L, path.c_str());
+    return 1;
+}
+
+int GpkScriptBinder::lua_OpenFileDialog(lua_State* L) {
+    const char* title = luaL_optstring(L, 1, "選擇封包檔案");
+    #if defined(_WIN32)
+    std::string cmd = "powershell -NoProfile -Command \"Add-Type -AssemblyName System.Windows.Forms; "
+    "$f = New-Object System.Windows.Forms.OpenFileDialog; "
+    "$f.Filter = 'Girigara Archive (*.imz;*.luz;*.dtz;*.auz)|*.imz;*.luz;*.dtz;*.auz|All files (*.*)|*.*'; "
+    "if($f.ShowDialog() -eq 'OK'){ $f.FileName }\"";
+    #else
+    std::string cmd = "zenity --file-selection --title=\"" + std::string(title) +
+    "\" --file-filter='Girigara Archive | *.imz *.luz *.dtz *.auz' --file-filter='All files | *' 2>/dev/null "
+    "|| kdialog --getopenfilename . '*.imz *.luz *.dtz *.auz' --title \"" + std::string(title) + "\" 2>/dev/null";
+    #endif
+    std::string path = runDialogCommand(cmd);
+    if (path.empty()) lua_pushnil(L);
+    else lua_pushstring(L, path.c_str());
+    return 1;
 }

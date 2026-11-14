@@ -44,11 +44,12 @@ private:
     void onCursorPos(double xpos, double ypos);
     void onMouseButton(int button, int action, int mods);
     void onKey(int key, int scancode, int action, int mods);
-    void onChar(unsigned int codepoint); // ★ 新增：字元輸入成員函式
+    void onChar(unsigned int codepoint);
     void onWindowFocus(int focused);
     void onWindowSize(int width, int height);
     void onFramebufferSize(int width, int height);
     void onWindowContentScale(float xscale, float yscale);
+    void onDrop(int count, const char** paths);
 
     static void staticCursorPosCallback(GLFWwindow* window, double xpos, double ypos);
     static void staticMouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
@@ -60,6 +61,7 @@ private:
     static void staticWindowContentScaleCallback(GLFWwindow* window, float xscale, float yscale);
     void onScroll(double xoffset, double yoffset);
     static void staticScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+    static void staticDropCallback(GLFWwindow* window, int count, const char** paths);
     LoggerSystem& m_logger;
 };
 

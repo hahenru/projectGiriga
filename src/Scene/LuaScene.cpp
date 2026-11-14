@@ -5,6 +5,7 @@
 #include <Scene/LuaScene.h>
 #include <UI/UIContainer.h>
 #include <Resource/ScriptResource.h>
+#include <Event/Event.h>
 
 #ifndef GIRIGARA_SERVER
 std::unique_ptr<UIContainer> LuaScene::createUI() {

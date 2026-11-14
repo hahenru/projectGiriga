@@ -53,6 +53,8 @@ public:
     void update(float dt);
     void render();
 
+    IResourceManager& getResources() { return m_resources; }
+
 private:
     void bindEvents();
     void registerScriptBindings();

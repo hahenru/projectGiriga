@@ -31,6 +31,7 @@ WindowManager::WindowManager(int width, int height, const std::string& title, Ev
     glfwSetFramebufferSizeCallback(m_window, staticFramebufferSizeCallback);
     glfwSetWindowContentScaleCallback(m_window, staticWindowContentScaleCallback);
     glfwSetScrollCallback(m_window, staticScrollCallback);
+    glfwSetDropCallback(m_window, staticDropCallback);
     m_logger.info("[WindowManager] GLFW callback function註冊完畢");
 }
 
@@ -47,6 +48,7 @@ WindowManager::~WindowManager() {
         glfwSetFramebufferSizeCallback(m_window, nullptr);
         glfwSetWindowContentScaleCallback(m_window, nullptr);
         glfwSetScrollCallback(m_window, nullptr);
+        glfwSetDropCallback(m_window, nullptr);
 
         glfwDestroyWindow(m_window);
         m_window = nullptr;
@@ -158,6 +160,18 @@ void WindowManager::onScroll(double xoffset, double yoffset) {
     m_eventBus.publish(event);
 }
 
+void WindowManager::onDrop(int count, const char** paths) {
+    if (count <= 0 || !paths) return;
+    std::vector<std::string> dropped;
+    dropped.reserve(static_cast<size_t>(count));
+    for (int i = 0; i < count; ++i) {
+        if (paths[i]) dropped.emplace_back(paths[i]);
+    }
+    if (!dropped.empty()) {
+        m_eventBus.publish(FileDropEvent(std::move(dropped)));
+    }
+}
+
 // -------------------------------------------------------------
 // GLFW 靜態回調函式轉發
 // -------------------------------------------------------------
@@ -207,4 +221,9 @@ void WindowManager::staticWindowSizeCallback(GLFWwindow* window, int width, int 
 void WindowManager::staticWindowContentScaleCallback(GLFWwindow* window, float xscale, float yscale) {
     auto* self = static_cast<WindowManager*>(glfwGetWindowUserPointer(window));
     if (self) self->onWindowContentScale(xscale, yscale);
+}
+
+void WindowManager::staticDropCallback(GLFWwindow* window, int count, const char** paths) {
+    auto* self = static_cast<WindowManager*>(glfwGetWindowUserPointer(window));
+    if (self) self->onDrop(count, paths);
 }
