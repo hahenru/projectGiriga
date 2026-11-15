@@ -371,6 +371,84 @@ endif
 tree:
 	$(TREE_CMD)
 
+map:
+	python3 genProjectMap.py
+
+# ==========================================
+# 說明文件 (跨平台 Linux / Windows CMD 相容)
+# ==========================================
+help:
+ifeq ($(HOST_OS),Windows)
+	@echo ============================================================================
+	@echo   Project Girigara - Makefile 編譯與打包指令總覽 (目前環境: $(HOST_OS))
+	@echo ============================================================================
+	@echo   [預設與全量編譯]
+	@echo     make                  - 執行預設目標 ($(DEFAULT_GOAL))
+	@echo     make all              - 建置 Linux 全端 + Windows 交叉編譯 + Flatpak
+	@echo     make linux-all        - 一次編譯 Linux 端的 Client、Server 與 GpkTool
+	@echo.
+	@echo   [Linux 原生目標 - 輸出至 $(LINUX_OUT_DIR)/]
+	@echo     make linux            - 編譯整合版 Client (含本地服) 並打包 .tar.gz
+	@echo     make server           - 編譯無頭獨立伺服器 (projectGIRIGARA_server)
+	@echo     make tool             - 編譯 GPK 封包工具 (projectGIRIGARA_tool)
+	@echo     make package_linux    - 僅重新打包 Linux 發布壓縮包 (.tar.gz)
+	@echo.
+	@echo   [Windows 交叉編譯 (Linux 端執行) - 輸出至 $(WIN_OUT_DIR)/]
+	@echo     make win64            - 靜態連結 MinGW-w64 執行檔並打包 .zip
+	@echo     make package_win      - 僅重新打包 Windows 交叉編譯 .zip
+	@echo.
+	@echo   [Windows 原生編譯 (Windows CMD 執行) - 輸出至 $(WIN_NAT_OUT_DIR)/]
+	@echo     make win64-native     - 原生編譯 Client 並打包 win64_native.zip
+	@echo     make win64-native-server - 原生編譯無頭伺服器 (.exe)
+	@echo.
+	@echo   [Linux 系統發行版打包 (v$(VERSION))]
+	@echo     make rpm              - 透過 git archive 與 rpmbuild 建置 RPM 套件
+	@echo     make flatpak          - 編譯並匯出獨立 .flatpak 安裝檔
+	@echo     make flatpak-install  - 編譯並直接安裝 Flatpak 至本機使用者環境
+	@echo.
+	@echo   [開發輔助與清理]
+	@echo     make map              - 更新架構與函式簽名地圖 (PROJECT_SIGNATURE_MAP.md)
+	@echo     make tree             - 匯出目前專案目錄樹至 tree.txt
+	@echo     make clean            - 清除 build/、Flatpak 建置快取與 repo 目錄
+	@echo ============================================================================
+else
+	@printf '%s\n' \
+	"============================================================================" \
+	"  Project Girigara - Makefile 編譯與打包指令總覽 (目前環境: $(HOST_OS))" \
+	"============================================================================" \
+	"  [預設與全量編譯]" \
+	"    make                  - 執行預設目標 ($(DEFAULT_GOAL))" \
+	"    make all              - 建置 Linux 全端 + Windows 交叉編譯 + Flatpak" \
+	"    make linux-all        - 一次編譯 Linux 端的 Client、Server 與 GpkTool" \
+	"" \
+	"  [Linux 原生目標 - 輸出至 $(LINUX_OUT_DIR)/]" \
+	"    make linux            - 編譯整合版 Client (含本地服) 並打包 .tar.gz" \
+	"    make server           - 編譯無頭獨立伺服器 (projectGIRIGARA_server)" \
+	"    make tool             - 編譯 GPK 封包工具 (projectGIRIGARA_tool)" \
+	"    make package_linux    - 僅重新打包 Linux 發布壓縮包 (.tar.gz)" \
+	"" \
+	"  [Windows 交叉編譯 (Linux 端執行) - 輸出至 $(WIN_OUT_DIR)/]" \
+	"    make win64            - 靜態連結 MinGW-w64 執行檔並打包 .zip" \
+	"    make package_win      - 僅重新打包 Windows 交叉編譯 .zip" \
+	"" \
+	"  [Windows 原生編譯 (Windows CMD 執行) - 輸出至 $(WIN_NAT_OUT_DIR)/]" \
+	"    make win64-native     - 原生編譯 Client 並打包 win64_native.zip" \
+	"    make win64-native-server - 原生編譯無頭伺服器 (.exe)" \
+	"" \
+	"  [Linux 系統發行版打包 (v$(VERSION))]" \
+	"    make rpm              - 透過 git archive 與 rpmbuild 建置 RPM 套件" \
+	"    make flatpak          - 編譯並匯出獨立 .flatpak 安裝檔" \
+	"    make flatpak-install  - 編譯並直接安裝 Flatpak 至本機使用者環境" \
+	"" \
+	"  [開發輔助與清理]" \
+	"    make map              - 更新架構與函式簽名地圖 (PROJECT_SIGNATURE_MAP.md)" \
+	"    make tree             - 匯出目前專案目錄樹至 tree.txt" \
+	"    make clean            - 清除 build/、Flatpak 建置快取與 repo 目錄" \
+	"============================================================================"
+endif
+
+
 .PHONY: all linux-all linux server tool win64 win64-native win64-native-server \
         copy_assets_linux package_linux copy_assets_win package_win \
-        copy_assets_win_nat package_win_nat clean rpm flatpak flatpak-install tree
+        copy_assets_win_nat package_win_nat clean rpm flatpak flatpak-install \
+        tree map help
