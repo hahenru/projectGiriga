@@ -76,6 +76,7 @@ make all
 
 # 執行客戶端
 ./build/projectGIRIGARA
+```
 
 一點額外事項，在這個版本中，我修改了makefile，所以我想之後你應該可以直接在windows編譯了，不過依賴的部分你得自己編譯，然後放到環境變數中CPATH和LIBRARY_PATH所在的位置。
 或是我想你的包管理器可以替你完成這件事情，以下是使用的host是Windows 11 + mingw-w64
@@ -92,6 +93,10 @@ make win64-native-server
 ```
 
 對，就這麼簡單，我做了點判斷，現在他會看你的電腦是Windows嗎?但我沒考慮過都不是的部分。還請見諒。
+除此之外，你可以使用以下指令，獲得全部詳細的編譯目標
+```bash
+make help
+```
 
 ## 系統依賴與軟體包需求
 
