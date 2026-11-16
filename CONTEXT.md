@@ -15,7 +15,7 @@
 - **建置系統**：純 GNU `Makefile`（不使用 CMake），`include/` 與 `src/` 嚴格 1:1 目錄對齊。
 - **四端分流建置目標**：
   - `projectGIRIGARA`：預設整合版 Client（含本機 Server 能力）。
-  - Pure Client：僅連線遠端，無 Server 模組。
+  - `Pure Client`：僅連線遠端，無 Server 模組。
   - `projectGIRIGARA_server`：無頭伺服器（定義 `GIRIGARA_SERVER`，零視窗、零音訊、零 OpenGL 依賴，讀取自動生成的 `server.cfg`）。
   - `projectGIRIGARA_tool`：獨立 GUI 資源封包工具（零網路、零音訊依賴，載入 `assets/scripts/packer_tool.lua`）。
 - **開發與發版環境**：Fedora Linux (KDE Plasma on Wayland, HiDPI)，支援 MinGW-w64 交叉編譯 Windows 版與 Flatpak (`com.hahenru.girigara`) 打包。

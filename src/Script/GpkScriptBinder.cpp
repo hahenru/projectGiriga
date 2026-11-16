@@ -5,6 +5,17 @@
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#if defined(_WIN32)
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #include <shobjidl.h> // IFileOpenDialog
+    #include <vector>
+#endif
 
 extern "C" {
     #include <lauxlib.h>
@@ -274,62 +285,131 @@ int GpkScriptBinder::lua_GpkExtractAll(lua_State* L) {
 }
 
 namespace {
+#if defined(_WIN32)
+    std::wstring utf8ToWide(const std::string& utf8) {
+        if (utf8.empty()) return L"";
+        int len = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
+        if (len <= 0) return L"";
+        std::wstring wide(static_cast<size_t>(len), L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), wide.data(), len);
+        return wide;
+    }
+
+    std::string wideToUtf8(const wchar_t* wide) {
+        if (!wide || *wide == L'\0') return "";
+        int len = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
+        if (len <= 1) return "";
+        std::string utf8(static_cast<size_t>(len - 1), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8.data(), len, nullptr, nullptr);
+        return utf8;
+    }
+
+    // 透過 Win32 COM IFileOpenDialog 顯示現代系統對話框（folderMode = true 選資料夾，false 選檔案）
+    std::string showWin32OpenDialog(const std::string& titleUtf8, bool folderMode, const std::string& filterPatternUtf8 = "") {
+        std::string selectedUtf8;
+
+        HRESULT hrInit = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+        bool needUninit = SUCCEEDED(hrInit);
+
+        IFileOpenDialog* pDialog = nullptr;
+        HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pDialog));
+        if (SUCCEEDED(hr) && pDialog) {
+            DWORD options = 0;
+            if (SUCCEEDED(pDialog->GetOptions(&options))) {
+                options |= FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST;
+                if (folderMode) {
+                    options |= FOS_PICKFOLDERS;
+                } else {
+                    options |= FOS_FILEMUSTEXIST;
+                }
+                pDialog->SetOptions(options);
+            }
+
+            std::wstring wTitle = utf8ToWide(titleUtf8);
+            if (!wTitle.empty()) {
+                pDialog->SetTitle(wTitle.c_str());
+            }
+
+            std::wstring wSpec;
+            if (!folderMode) {
+                wSpec = filterPatternUtf8.empty()
+                    ? L"*.imz;*.luz;*.dtz;*.auz"
+                    : utf8ToWide(filterPatternUtf8);
+                COMDLG_FILTERSPEC fileTypes[] = {
+                    { L"Girigara Archive", wSpec.c_str() },
+                    { L"All Files (*.*)",  L"*.*" }
+                };
+                pDialog->SetFileTypes(2, fileTypes);
+                pDialog->SetFileTypeIndex(1);
+            }
+
+            // 取得目前前景視窗作為 Owner，避免對話框跑到遊戲視窗後方
+            HWND ownerHwnd = GetActiveWindow();
+            if (SUCCEEDED(pDialog->Show(ownerHwnd))) {
+                IShellItem* pItem = nullptr;
+                if (SUCCEEDED(pDialog->GetResult(&pItem)) && pItem) {
+                    PWSTR pszFilePath = nullptr;
+                    if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)) && pszFilePath) {
+                        selectedUtf8 = wideToUtf8(pszFilePath);
+                        CoTaskMemFree(pszFilePath);
+                    }
+                    pItem->Release();
+                }
+            }
+            pDialog->Release();
+        }
+
+        if (needUninit) {
+            CoUninitialize();
+        }
+        return selectedUtf8;
+    }
+#else
     std::string runDialogCommand(const std::string& cmd) {
         std::string result;
-        #if defined(_WIN32)
-        FILE* pipe = _popen(cmd.c_str(), "r");
-        #else
         FILE* pipe = popen(cmd.c_str(), "r");
-        #endif
         if (!pipe) return result;
         char buf[512];
         while (fgets(buf, sizeof(buf), pipe)) {
             result += buf;
         }
-        #if defined(_WIN32)
-        _pclose(pipe);
-        #else
         pclose(pipe);
-        #endif
         while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
             result.pop_back();
         }
         return result;
     }
+#endif
 } // namespace
 
 // @luaFunc OpenFolderDialog(title?: string) -> string|nil
 int GpkScriptBinder::lua_OpenFolderDialog(lua_State* L) {
     const char* title = luaL_optstring(L, 1, "選擇目標資料夾");
-    #if defined(_WIN32)
-    std::string cmd = "powershell -NoProfile -Command \"Add-Type -AssemblyName System.Windows.Forms; "
-    "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
-    "$f.Description = '" + std::string(title) + "'; "
-    "if($f.ShowDialog() -eq 'OK'){ $f.SelectedPath }\"";
-    #else
+#if defined(_WIN32)
+    std::string path = showWin32OpenDialog(title, true);
+#else
     std::string cmd = "zenity --file-selection --directory --title=\"" + std::string(title) +
-    "\" 2>/dev/null || kdialog --getexistingdirectory . --title \"" + std::string(title) + "\" 2>/dev/null";
-    #endif
+                      "\" 2>/dev/null || kdialog --getexistingdirectory . --title \"" + std::string(title) + "\" 2>/dev/null";
     std::string path = runDialogCommand(cmd);
+#endif
     if (path.empty()) lua_pushnil(L);
     else lua_pushstring(L, path.c_str());
     return 1;
 }
 
-// @luaFunc OpenFileDialog(title?: string) -> string|nil
+// @luaFunc OpenFileDialog(title?: string, filter?: string) -> string|nil
 int GpkScriptBinder::lua_OpenFileDialog(lua_State* L) {
-    const char* title = luaL_optstring(L, 1, "選擇封包檔案");
-    #if defined(_WIN32)
-    std::string cmd = "powershell -NoProfile -Command \"Add-Type -AssemblyName System.Windows.Forms; "
-    "$f = New-Object System.Windows.Forms.OpenFileDialog; "
-    "$f.Filter = 'Girigara Archive (*.imz;*.luz;*.dtz;*.auz)|*.imz;*.luz;*.dtz;*.auz|All files (*.*)|*.*'; "
-    "if($f.ShowDialog() -eq 'OK'){ $f.FileName }\"";
-    #else
+    const char* title  = luaL_optstring(L, 1, "選擇封包檔案");
+    const char* filter = luaL_optstring(L, 2, "");
+#if defined(_WIN32)
+    std::string path = showWin32OpenDialog(title, false, filter);
+#else
+    std::string fileFilter = (filter && filter[0] != '\0') ? filter : "*.imz *.luz *.dtz *.auz";
     std::string cmd = "zenity --file-selection --title=\"" + std::string(title) +
-    "\" --file-filter='Girigara Archive | *.imz *.luz *.dtz *.auz' --file-filter='All files | *' 2>/dev/null "
-    "|| kdialog --getopenfilename . '*.imz *.luz *.dtz *.auz' --title \"" + std::string(title) + "\" 2>/dev/null";
-    #endif
+                      "\" --file-filter='Girigara Archive | " + fileFilter + "' --file-filter='All files | *' 2>/dev/null "
+                      "|| kdialog --getopenfilename . '" + fileFilter + "' --title \"" + std::string(title) + "\" 2>/dev/null";
     std::string path = runDialogCommand(cmd);
+#endif
     if (path.empty()) lua_pushnil(L);
     else lua_pushstring(L, path.c_str());
     return 1;
