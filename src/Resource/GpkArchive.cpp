@@ -1,4 +1,5 @@
 #include <Resource/GpkArchive.h>
+#include <Inline/PathDecode.h>
 #include <cstring>
 #include <random>
 #include <iostream>
@@ -116,7 +117,8 @@ size_t GpkArchive::onMinizRead(void* pOpaque, mz_uint64 fileOfs, void* pBuf, siz
 bool GpkArchive::open(const std::string& archivePath, const Key256& key) {
     close();
 
-    m_file.open(archivePath, std::ios::binary | std::ios::ate);
+    // 修正：將 UTF-8 的 archivePath 轉成 fs::path，讓 m_file.open 在 Windows 上走寬字元路徑
+    m_file.open(pathFromUtf8(archivePath), std::ios::binary | std::ios::ate);
     if (!m_file.is_open()) {
         std::cerr << "[GpkArchive] Cannot open archive: " << archivePath << "\n";
         return false;
@@ -213,7 +215,8 @@ bool GpkArchive::packFiles(const std::string& outputArchivePath,
     }
 
     for (const auto& entry : entries) {
-        std::ifstream in(entry.sourceDiskPath, std::ios::binary | std::ios::ate);
+        // 1. 修正：讀取來源檔案時包上 pathFromUtf8
+        std::ifstream in(pathFromUtf8(entry.sourceDiskPath), std::ios::binary | std::ios::ate);
         if (!in.is_open()) {
             mz_zip_writer_end(&writer);
             return false;
@@ -260,7 +263,8 @@ bool GpkArchive::packFiles(const std::string& outputArchivePath,
         chacha20Xor(payload.data(), payload.size(), 0, key, nonce);
     }
 
-    std::ofstream out(outputArchivePath, std::ios::binary | std::ios::trunc);
+    // 2. 修正：寫出目標封包檔時包上 pathFromUtf8
+    std::ofstream out(pathFromUtf8(outputArchivePath), std::ios::binary | std::ios::trunc);
     if (!out.is_open()) return false;
 
     out.write(reinterpret_cast<const char*>(header), GPK_HEADER_SIZE);

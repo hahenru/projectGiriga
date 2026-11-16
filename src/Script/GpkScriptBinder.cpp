@@ -1,4 +1,5 @@
 #include <Script/GpkScriptBinder.h>
+#include <Inline/PathDecode.h>
 #include <Event/Event.h>
 #include <filesystem>
 #include <fstream>
@@ -23,24 +24,53 @@ extern "C" {
 
 namespace fs = std::filesystem;
 
+namespace {
+    constexpr const char* GPK_BINDER_REGISTRY_KEY = "Girigara_GpkScriptBinder";
+
+    GpkScriptBinder* getBinderFromLua(lua_State* L) {
+        lua_pushstring(L, GPK_BINDER_REGISTRY_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        auto* binder = static_cast<GpkScriptBinder*>(lua_touserdata(L, -1));
+        lua_pop(L, 1);
+        return binder;
+    }
+}
+
 GpkScriptBinder::GpkScriptBinder(EventBus& eventBus)
 : m_eventBus(eventBus) {
+    m_eventBus.subscribe<GpkPackCompletedEvent>(
+        [this](GpkPackCompletedEvent& e) { onPackCompleted(e); },
+        m_id
+    );
+
     m_eventBus.publish(RegisterScriptBindingEvent{
         m_id,
-        "Girigara_GpkScriptBinder",
+        GPK_BINDER_REGISTRY_KEY,
         this,
         {
-            { "GpkPackDirectory", &GpkScriptBinder::lua_GpkPackDirectory },
-            { "GpkPackFiles",     &GpkScriptBinder::lua_GpkPackFiles },
-            { "GpkList",          &GpkScriptBinder::lua_GpkList },
-            { "GpkExtractAll",    &GpkScriptBinder::lua_GpkExtractAll },
-            { "OpenFolderDialog", &GpkScriptBinder::lua_OpenFolderDialog },
-            { "OpenFileDialog",   &GpkScriptBinder::lua_OpenFileDialog }
+            { "GpkPackDirectory",      &GpkScriptBinder::lua_GpkPackDirectory },
+            { "GpkPackDirectoryAsync", &GpkScriptBinder::lua_GpkPackDirectoryAsync },
+            { "GpkPackFiles",          &GpkScriptBinder::lua_GpkPackFiles },
+            { "GpkList",               &GpkScriptBinder::lua_GpkList },
+            { "GpkExtractAll",         &GpkScriptBinder::lua_GpkExtractAll },
+            { "OpenFolderDialog",      &GpkScriptBinder::lua_OpenFolderDialog },
+            { "OpenFileDialog",        &GpkScriptBinder::lua_OpenFileDialog }
         }
     });
 }
 
 GpkScriptBinder::~GpkScriptBinder() {
+    // 1. 先清空 workers：std::jthread 解構自動發出 stop_token 並 join()，確保不再有任何背景執行緒存取成員
+    {
+        std::lock_guard<std::mutex> lock(m_workersMutex);
+        m_workers.clear();
+    }
+
+    // 2. 在主執行緒釋放所有尚未觸發的 LuaRef
+    m_pendingCallbacks.clear();
+
+    // 3. 退訂 EventBus 與 Lua 函式綁定
+    m_eventBus.unsubscribeByOwner(m_id);
     m_eventBus.publish(UnregisterScriptBindingEvent{ m_id });
 }
 
@@ -111,7 +141,8 @@ int GpkScriptBinder::lua_GpkPackDirectory(lua_State* L) {
     const char* keyStr     = luaL_optstring(L, 4, "");
     bool encrypt           = lua_isnoneornil(L, 5) ? true : (lua_toboolean(L, 5) != 0);
 
-    fs::path srcDir(srcDirStr);
+    // 1. 修正：使用 pathFromUtf8
+    fs::path srcDir = pathFromUtf8(srcDirStr);
     if (!fs::exists(srcDir) || !fs::is_directory(srcDir)) {
         lua_pushboolean(L, 0);
         lua_pushstring(L, "Source directory does not exist.");
@@ -129,9 +160,13 @@ int GpkScriptBinder::lua_GpkPackDirectory(lua_State* L) {
     for (const auto& entry : fs::recursive_directory_iterator(srcDir)) {
         if (!entry.is_regular_file()) continue;
         fs::path relPath = fs::relative(entry.path(), srcDir);
-        // 統一轉換為正斜線 '/' 作為封包內部虛擬路徑（跨 Linux / Windows 相容）
-        std::string virtualPath = relPath.generic_string();
-        entries.push_back(GpkArchive::PackEntry{ virtualPath, entry.path().string() });
+        
+        // 2. 修正：確保封包內部虛擬路徑也是正確的 UTF-8，並統一正斜線
+        std::string virtualPath = pathToUtf8(relPath);
+        std::ranges::replace(virtualPath, '\\', '/'); // C++20/23 ranges 寫法 (需 #include <algorithm>)
+
+        // 3. 修正：entities 存的實體路徑若給 std::ifstream 開啟，也必須是 UTF-8
+        entries.push_back(GpkArchive::PackEntry{ std::move(virtualPath), pathToUtf8(entry.path()) });
     }
 
     if (entries.empty()) {
@@ -140,13 +175,15 @@ int GpkScriptBinder::lua_GpkPackDirectory(lua_State* L) {
         return 2;
     }
 
-    fs::path outPath(outPathStr);
+    // 4. 修正：使用 pathFromUtf8
+    fs::path outPath = pathFromUtf8(outPathStr);
     if (outPath.has_parent_path()) {
         std::error_code ec;
         fs::create_directories(outPath.parent_path(), ec);
     }
 
     GpkArchive::Key256 key = parseKey(keyStr);
+    // 注意：請確保 GpkArchive::packFiles 內部開啟 outPathStr 與 entries 裡的路徑時，也有使用 pathFromUtf8！
     if (!GpkArchive::packFiles(outPathStr, type, entries, key, encrypt)) {
         lua_pushboolean(L, 0);
         lua_pushstring(L, "Failed to write encrypted archive.");
@@ -156,6 +193,150 @@ int GpkScriptBinder::lua_GpkPackDirectory(lua_State* L) {
     std::string msg = "Successfully packed " + std::to_string(entries.size()) + " files into " + outPathStr;
     lua_pushboolean(L, 1);
     lua_pushstring(L, msg.c_str());
+    return 2;
+}
+
+void GpkScriptBinder::cleanupFinishedWorkers() {
+    std::lock_guard<std::mutex> lock(m_workersMutex);
+    std::erase_if(m_workers, [](const WorkerSlot& slot) {
+        return slot.finished && slot.finished->load(std::memory_order_acquire);
+    });
+}
+
+void GpkScriptBinder::onPackCompleted(GpkPackCompletedEvent& e) {
+    // 順便回收已結束的 jthread
+    cleanupFinishedWorkers();
+
+    auto it = m_pendingCallbacks.find(e.taskId);
+    if (it == m_pendingCallbacks.end()) {
+        return;
+    }
+
+    // 取出後立即從 map 移除，確保即使 Lua 回呼內拋錯或再次呼叫 Async 也不會重入或洩漏
+    LuaRef callback = std::move(it->second);
+    m_pendingCallbacks.erase(it);
+
+    if (callback.isValid() && callback.isFunction()) {
+        lua_State* L = callback.getState();
+        callback.push();
+        lua_pushboolean(L, e.success ? 1 : 0);
+        lua_pushstring(L, e.message.c_str());
+        lua_pushstring(L, e.outPath.c_str());
+
+        if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
+            // 彈出錯誤字串避免污染 Lua 堆疊
+            lua_pop(L, 1);
+        }
+    }
+}
+
+// @luaFunc GpkPackDirectoryAsync(srcDir: string, outPath: string, type: string, key?: string, encrypt?: boolean, onComplete?: function) -> boolean, string
+int GpkScriptBinder::lua_GpkPackDirectoryAsync(lua_State* L) {
+    GpkScriptBinder* self = getBinderFromLua(L);
+    if (!self) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "Internal error: GpkScriptBinder pointer is null.");
+        return 2;
+    }
+
+    // 1. 在主執行緒收集並複製所有參數（背景執行緒絕不接觸 lua_State 或 LuaRef）
+    std::string srcDirStr  = luaL_checkstring(L, 1);
+    std::string outPathStr = luaL_checkstring(L, 2);
+    std::string typeStr    = luaL_checkstring(L, 3);
+    std::string keyStr     = luaL_optstring(L, 4, "");
+    bool encrypt           = lua_isnoneornil(L, 5) ? true : (lua_toboolean(L, 5) != 0);
+
+    LuaRef callbackRef;
+    if (lua_isfunction(L, 6)) {
+        lua_pushvalue(L, 6);
+        callbackRef = LuaRef::fromStack(L);
+    }
+
+    GpkType type = parseType(typeStr);
+    if (type == GpkType::Unknown) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "Invalid archive type (expected imz, luz, dtz, or auz).");
+        return 2;
+    }
+
+    self->cleanupFinishedWorkers();
+
+    uint64_t taskId = self->m_nextTaskId.fetch_add(1, std::memory_order_relaxed);
+    if (callbackRef.isValid()) {
+        self->m_pendingCallbacks.emplace(taskId, std::move(callbackRef));
+    }
+
+    GpkArchive::Key256 key = parseKey(keyStr);
+    auto finishedFlag = std::make_shared<std::atomic<bool>>(false);
+
+    // 2. 啟動 std::jthread 在背景執行掃描與 GpkArchive::packFiles
+    std::jthread worker([self,
+                         finishedFlag,
+                         taskId,
+                         srcDirStr = std::move(srcDirStr),
+                         outPathStr = std::move(outPathStr),
+                         type,
+                         key,
+                         encrypt](std::stop_token stoken) {
+        bool ok = false;
+        std::string msg;
+
+        try {
+            fs::path srcDir = pathFromUtf8(srcDirStr);
+            if (!fs::exists(srcDir) || !fs::is_directory(srcDir)) {
+                msg = "Source directory does not exist.";
+            } else {
+                std::vector<GpkArchive::PackEntry> entries;
+                for (const auto& entry : fs::recursive_directory_iterator(srcDir)) {
+                    if (stoken.stop_requested()) {
+                        msg = "Packing cancelled.";
+                        self->m_eventBus.enqueue(GpkPackCompletedEvent{ taskId, false, outPathStr, std::move(msg) });
+                        finishedFlag->store(true, std::memory_order_release);
+                        return;
+                    }
+                    if (!entry.is_regular_file()) continue;
+
+                    fs::path relPath = fs::relative(entry.path(), srcDir);
+                    std::string virtualPath = pathToUtf8(relPath);
+                    std::ranges::replace(virtualPath, '\\', '/');
+
+                    entries.push_back(GpkArchive::PackEntry{ std::move(virtualPath), pathToUtf8(entry.path()) });
+                }
+
+                if (entries.empty()) {
+                    msg = "No files found in source directory.";
+                } else if (!stoken.stop_requested()) {
+                    fs::path outPath = pathFromUtf8(outPathStr);
+                    if (outPath.has_parent_path()) {
+                        std::error_code ec;
+                        fs::create_directories(outPath.parent_path(), ec);
+                    }
+
+                    if (GpkArchive::packFiles(outPathStr, type, entries, key, encrypt)) {
+                        ok = true;
+                        msg = "Successfully packed " + std::to_string(entries.size()) + " files into " + outPathStr;
+                    } else {
+                        msg = "Failed to write encrypted archive.";
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            ok = false;
+            msg = std::string("Exception during async pack: ") + e.what();
+        }
+
+        // 3. 透過執行緒安全的 EventBus::enqueue 將完成事件排入主執行緒佇列
+        self->m_eventBus.enqueue(GpkPackCompletedEvent{ taskId, ok, std::move(outPathStr), std::move(msg) });
+        finishedFlag->store(true, std::memory_order_release);
+    });
+
+    {
+        std::lock_guard<std::mutex> lock(self->m_workersMutex);
+        self->m_workers.push_back(WorkerSlot{ std::move(finishedFlag), std::move(worker) });
+    }
+
+    lua_pushboolean(L, 1);
+    lua_pushstring(L, "Async pack task started.");
     return 2;
 }
 
@@ -241,13 +422,15 @@ int GpkScriptBinder::lua_GpkExtractAll(lua_State* L) {
     const char* keyStr      = luaL_optstring(L, 3, "");
 
     GpkArchive arc;
+    // 注意：請確保 arc.open 內部開啟 archivePath 時也有使用 pathFromUtf8
     if (!arc.open(archivePath, parseKey(keyStr))) {
         lua_pushboolean(L, 0);
         lua_pushstring(L, "Failed to open archive (invalid file or wrong key).");
         return 2;
     }
 
-    fs::path outRoot(outDirStr);
+    // 1. 修正：使用 pathFromUtf8
+    fs::path outRoot = pathFromUtf8(outDirStr);
     auto files = arc.listFiles();
     size_t extractedCount = 0;
 
@@ -259,7 +442,8 @@ int GpkScriptBinder::lua_GpkExtractAll(lua_State* L) {
             return 2;
         }
 
-        fs::path targetPath = outRoot / fs::path(virtualPath);
+        // 2. 修正：virtualPath 也可能包含中文，必須用 pathFromUtf8 轉換後再拼接
+        fs::path targetPath = outRoot / pathFromUtf8(virtualPath);
         if (targetPath.has_parent_path()) {
             std::error_code ec;
             fs::create_directories(targetPath.parent_path(), ec);
@@ -268,7 +452,8 @@ int GpkScriptBinder::lua_GpkExtractAll(lua_State* L) {
         std::ofstream out(targetPath, std::ios::binary | std::ios::trunc);
         if (!out.is_open()) {
             lua_pushboolean(L, 0);
-            lua_pushfstring(L, "Cannot write output file: %s", targetPath.string().c_str());
+            // 3. 修正：錯誤訊息回傳給 Lua 時使用 pathToUtf8，避免路徑在 Lua 端變成亂碼
+            lua_pushfstring(L, "Cannot write output file: %s", pathToUtf8(targetPath).c_str());
             return 2;
         }
 

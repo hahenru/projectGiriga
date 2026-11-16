@@ -9,6 +9,8 @@
 #include <typeindex>
 #include <utility>
 #include <algorithm>
+#include <mutex>
+#include <queue>
 
 class EventBus {
 public:
@@ -78,6 +80,29 @@ public:
         }
         if (m_dispatchDepth == 0) cleanupInactive();
     }
+	// 5. ★ 執行緒安全：允許背景執行緒排入事件，延遲至主執行緒呼叫 dispatchQueued() 時派發
+    template <typename T>
+    void enqueue(T&& event) {
+        using EventType = std::decay_t<T>;
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        m_eventQueue.push([this, ev = std::forward<T>(event)]() mutable {
+            publish(ev);
+        });
+    }
+
+    // 必須由主執行緒在主迴圈中呼叫，清空並派發所有背景執行緒排入的事件
+    void dispatchQueued() {
+        std::queue<std::function<void()>> localQueue;
+        {
+            std::lock_guard<std::mutex> lock(m_queueMutex);
+            if (m_eventQueue.empty()) return;
+            localQueue.swap(m_eventQueue);
+        }
+        while (!localQueue.empty()) {
+            localQueue.front()();
+            localQueue.pop();
+        }
+    }
 
     // 發布左值事件
     template <typename T>
@@ -125,6 +150,8 @@ private:
     std::unordered_map<std::type_index, std::vector<SubscriberEntry>> m_subscribers;
     int m_dispatchDepth = 0;
     bool m_hasDirtyEntries = false;
+	std::mutex m_queueMutex;
+    std::queue<std::function<void()>> m_eventQueue;
 };
 
 #endif // GIRIGARA_EVENT_EVENT_BUS_H

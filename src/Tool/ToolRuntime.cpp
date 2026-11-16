@@ -101,6 +101,9 @@ void ToolRuntime::run() {
 
         // 1. 輪詢視窗與輸入事件
         m_context->window->pollEvents();
+		
+		// 1.5 派發背景執行緒排入的事件（如 GpkPackCompletedEvent，並在主執行緒觸發 Lua 回呼）
+        m_context->eventBus->dispatchQueued();
 
         // 2. 邏輯 Tick (純場景與 UI，無網路輪詢)
         m_sceneManager->update(dt);

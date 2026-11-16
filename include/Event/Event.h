@@ -186,4 +186,16 @@ public:
     std::vector<std::string> paths;
 };
 
+// 壓縮檔案完成事件
+class GpkPackCompletedEvent : public Event {
+public:
+    uint64_t taskId = 0;
+    bool success = false;
+    std::string outPath;
+    std::string message;
+
+    GpkPackCompletedEvent(uint64_t taskId, bool success, std::string outPath, std::string message)
+        : taskId(taskId), success(success), outPath(std::move(outPath)), message(std::move(message)) {}
+};
+
 #endif // GIRIGARA_EVENT_EVENT_H

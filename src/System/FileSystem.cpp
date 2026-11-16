@@ -1,4 +1,5 @@
 #include <System/FileSystem.h>
+#include <Inline/PathDecode.h>
 #include <Event/Event.h>
 #include <filesystem>
 #include <fstream>
@@ -79,17 +80,17 @@ void FileSystem::handleFileDrop(const std::vector<std::string>& paths) {
 
 bool FileSystem::exists(const std::string& path) const {
     std::error_code ec;
-    return fs::exists(fs::path(path), ec);
+    return std::filesystem::exists(pathFromUtf8(path));
 }
 
 bool FileSystem::isDirectory(const std::string& path) const {
     std::error_code ec;
-    return fs::is_directory(fs::path(path), ec);
+    return std::filesystem::is_directory(pathFromUtf8(path));
 }
 
 bool FileSystem::isRegularFile(const std::string& path) const {
     std::error_code ec;
-    return fs::is_regular_file(fs::path(path), ec);
+    return std::filesystem::is_regular_file(pathFromUtf8(path));
 }
 
 bool FileSystem::readBinary(const std::string& path, std::vector<uint8_t>& outData) const {
