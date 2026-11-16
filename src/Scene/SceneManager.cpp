@@ -17,7 +17,7 @@ namespace {
         return mgr;
     }
 
-    // SwitchScene("MainMenuScript")
+    // @luaFunc SwitchScene(script: string)
     int lua_SwitchScene(lua_State* L) {
         const char* script = luaL_checkstring(L, 1);
         if (script && script[0] != '\0') {

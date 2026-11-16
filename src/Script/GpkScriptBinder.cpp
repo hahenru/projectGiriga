@@ -92,6 +92,7 @@ std::string GpkScriptBinder::typeToString(GpkType type) {
     }
 }
 
+// @luaFunc GpkPackDirectory(srcDir: string, outPath: string, type: string, key?: string, encrypt?: boolean) -> boolean, string
 int GpkScriptBinder::lua_GpkPackDirectory(lua_State* L) {
     const char* srcDirStr  = luaL_checkstring(L, 1);
     const char* outPathStr = luaL_checkstring(L, 2);
@@ -147,6 +148,7 @@ int GpkScriptBinder::lua_GpkPackDirectory(lua_State* L) {
     return 2;
 }
 
+// @luaFunc GpkPackFiles(fileList: table, outPath: string, type: string, key?: string, encrypt?: boolean) -> boolean, string
 int GpkScriptBinder::lua_GpkPackFiles(lua_State* L) {
     luaL_checktype(L, 1, LUA_TTABLE);
     const char* outPathStr = luaL_checkstring(L, 2);
@@ -197,6 +199,7 @@ int GpkScriptBinder::lua_GpkPackFiles(lua_State* L) {
     return 2;
 }
 
+// @luaFunc GpkList(archivePath: string, key?: string) -> table|nil, string
 int GpkScriptBinder::lua_GpkList(lua_State* L) {
     const char* archivePath = luaL_checkstring(L, 1);
     const char* keyStr      = luaL_optstring(L, 2, "");
@@ -220,6 +223,7 @@ int GpkScriptBinder::lua_GpkList(lua_State* L) {
     return 2;
 }
 
+// @luaFunc GpkExtractAll(archivePath: string, outDir: string, key?: string) -> boolean, string
 int GpkScriptBinder::lua_GpkExtractAll(lua_State* L) {
     const char* archivePath = luaL_checkstring(L, 1);
     const char* outDirStr   = luaL_checkstring(L, 2);
@@ -294,6 +298,7 @@ namespace {
     }
 } // namespace
 
+// @luaFunc OpenFolderDialog(title?: string) -> string|nil
 int GpkScriptBinder::lua_OpenFolderDialog(lua_State* L) {
     const char* title = luaL_optstring(L, 1, "選擇目標資料夾");
     #if defined(_WIN32)
@@ -311,6 +316,7 @@ int GpkScriptBinder::lua_OpenFolderDialog(lua_State* L) {
     return 1;
 }
 
+// @luaFunc OpenFileDialog(title?: string) -> string|nil
 int GpkScriptBinder::lua_OpenFileDialog(lua_State* L) {
     const char* title = luaL_optstring(L, 1, "選擇封包檔案");
     #if defined(_WIN32)

@@ -16,7 +16,7 @@ namespace {
         lua_pop(L, 1);
         return audio;
     }
-
+    // @luaFunc Audio_PlayBGM(path: string, loop?: boolean)
     int lua_Audio_PlayBGM(lua_State* L) {
         const char* path = luaL_checkstring(L, 1);
         bool loop = lua_isboolean(L, 2) ? (lua_toboolean(L, 2) != 0) : true;
@@ -28,14 +28,14 @@ namespace {
         }
         return 0;
     }
-
+    // @luaFunc Audio_StopBGM()
     int lua_Audio_StopBGM(lua_State* L) {
         if (AudioSystem* audio = getAudioFromLua(L)) {
             audio->stopBGM();
         }
         return 0;
     }
-
+    // @luaFunc Audio_PlaySFX(path: string)
     int lua_Audio_PlaySFX(lua_State* L) {
         const char* path = luaL_checkstring(L, 1);
         if (path) {
