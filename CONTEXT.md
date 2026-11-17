@@ -30,6 +30,9 @@
   - 16-byte `GRGZ` 容器檔頭 + `miniz` 壓縮 + 隨機偏移 256-bit ChaCha20 串流加解密。
   - 封包類型：`Image (.imz)`、`Script (.luz)`、`Database (.dtz)`、`Audio (.auz)`。
   - 已註冊 Lua API：`GpkPackDirectory`、`GpkPackFiles`、`GpkList`、`GpkExtractAll`、`OpenFolderDialog`、`OpenFileDialog`，以及視窗拖放全域回呼 `OnFileDrop(paths)`。
-
+- **更多詳細lua綁定函數**
+  - 上述並沒有完整陳述全部的可用函數，必要時候應該詢問使用`make stub`生成一個lua api map。
+ 
 ## 4. 協作輸出規範
 - 修改既有檔案時請直接提供精準的局部修改區塊或完整函式，避免每次貼出整份數百行無關程式碼，並嚴格對齊上述架構與命名風格。
+- 如果有需要特定功能或是函數，請不要瞎猜，應當請螢幕前的人類使用`make map`產生一個完整的C++函數簽名地圖，內涵函數簽名和所在位置以及每一個檔案的依賴。
