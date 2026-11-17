@@ -1,5 +1,5 @@
 #include <UI/UIConsole.h>
-#include <GLFW/glfw3.h>
+#include <Core/InputCode.h>
 #include <algorithm>
 
 UIConsole::UIConsole(float x, float y, float width, float height,
@@ -7,12 +7,12 @@ UIConsole::UIConsole(float x, float y, float width, float height,
          ConsoleSystem& consoleSystem, LoggerSystem& logger,
          IResourceManager& resourceManager,
          Shader& bgShader)
-: UIContainer(x, y, width, height),
-m_eventBus(eventBus),
-m_consoleSystem(consoleSystem),
-m_logger(logger),
-m_resources(resourceManager),
-m_bgShader(bgShader) {
+	: UIContainer(x, y, width, height),
+	m_eventBus(eventBus),
+	m_consoleSystem(consoleSystem),
+	m_logger(logger),
+	m_resources(resourceManager),
+	m_bgShader(bgShader) {
 
     setVisible(false);
     setPassThrough(false);
@@ -39,12 +39,17 @@ m_bgShader(bgShader) {
 }
 
 UIConsole::UIConsole(float x, float y, float width, float height,
-         EventBus& eventBus,
-         ConsoleSystem& consoleSystem, LoggerSystem& logger,
-         IResourceManager& resourceManager)
-: UIConsole(x, y, width, height, eventBus, consoleSystem, logger, resourceManager,
-resourceManager.get<Shader>("ConsoleBackground")) {}
+                     EventBus& eventBus,
+                     ConsoleSystem& consoleSystem, LoggerSystem& logger,
+                     IResourceManager& resourceManager,
+                     const std::string& vertPath,
+                     const std::string& fragPath)
+    : UIConsole(x, y, width, height, eventBus, consoleSystem, logger, resourceManager,
+                resourceManager.getOrLoadShader(kDefaultShaderName, vertPath, fragPath)) {}
 
+UIConsole::~UIConsole() {
+    m_eventBus.unsubscribeByOwner(getID());
+}
 void UIConsole::initItemPool() {
     m_itemPool.reserve(kPoolCapacity);
     m_poolBoundIndex.assign(kPoolCapacity, kInvalidIndex);
@@ -181,46 +186,31 @@ void UIConsole::bindEvents() {
         if (!this->isVisible()) return;
         e.isHandled = true;
 
-        bool isCtrlDown = (e.mods & GLFW_MOD_CONTROL) != 0;
-        if (!isCtrlDown) {
-            GLFWwindow* win = glfwGetCurrentContext();
-            if (win) {
-                isCtrlDown = (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
-                glfwGetKey(win, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
-            }
-        }
+        const bool isCtrlDown = (e.mods & InputCode::ModControl) != 0;
 
-        // 3. bindEvents 中的 Ctrl + 滾輪縮放：提高上限至 72，並同步放大提示符與輸入框
         if (isCtrlDown) {
-            int delta = (e.yoffset > 0.0) ? 2 : -2; // ★ 4K 螢幕每次跳 2px 縮放手感更順
-            int newSize = std::clamp(static_cast<int>(m_fontSize) + delta, 12, 72); // ★ 上限拉高到 72
+            int delta = (e.yoffset > 0.0) ? 2 : -2;
+            int newSize = std::clamp(static_cast<int>(m_fontSize) + delta, 12, 72);
 
             if (static_cast<unsigned int>(newSize) != m_fontSize) {
                 m_fontSize = static_cast<unsigned int>(newSize);
-
-                if (m_inputPrompt) {
-                    m_inputPrompt->setFontSize(m_fontSize);
-                }
-                if (m_inputField) {
-                    m_inputField->setFontSize(m_fontSize);
-                }
-
-                // 重新計算輸入框高度、捲動區高度與自動折行
+                if (m_inputPrompt) m_inputPrompt->setFontSize(m_fontSize);
+                if (m_inputField) m_inputField->setFontSize(m_fontSize);
                 layoutChildren(getWidth(), getHeight());
             }
         } else {
             m_scrollView->scroll(static_cast<float>(-e.yoffset * 24.0f));
             syncVirtualViewport();
         }
-    });
+    }, getID());
 
     m_eventBus.subscribePriority<KeyEvent>([this](KeyEvent& e) {
         if (!this->isVisible()) return;
-        if (e.key == GLFW_KEY_ESCAPE && e.action == GLFW_PRESS) {
+        if (e.key == InputCode::KeyEscape && e.action == InputCode::ActionPress) {
             this->setVisible(false);
             e.isHandled = true;
         }
-    });
+    }, getID());
 }
 
 void UIConsole::syncVirtualViewport() {

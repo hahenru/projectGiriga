@@ -54,14 +54,12 @@ GUI_COMMON_SRC = \
 	src/UI/UIPanel.cpp \
 	src/UI/UIButton.cpp \
 	src/UI/UIText.cpp \
-	src/UI/UIConsole.cpp \
 	src/UI/UIWindow.cpp \
 	src/UI/UIHorizontalLayout.cpp \
 	src/UI/UIVerticalLayout.cpp \
 	src/UI/UISlantedLayout.cpp \
 	src/UI/UIManager.cpp \
-	src/UI/UIFactory.cpp \
-	src/UI/UISettingsMenu.cpp
+	src/UI/UIFactory.cpp
 
 # 4. 客戶端專屬 (Client - 遊戲場景、音訊系統、全域設定表)
 CLIENT_SRC = \
@@ -74,7 +72,12 @@ CLIENT_SRC = \
 	src/Audio/AudioSystem.cpp \
 	src/Resource/AudioResource.cpp \
 	src/ThirdParty/miniaudio_impl.cpp \
-	src/System/SettingsRegistry.cpp
+	src/System/SettingsRegistry.cpp \
+	src/UI/UISettingsMenu.cpp \
+    src/UI/UIConsole.cpp
+
+
+
 
 # 5. 伺服器專屬 (Server - 無頭伺服器與外部設定檔)
 SERVER_SRC = \
@@ -144,9 +147,9 @@ CC  = gcc
 CXXFLAGS = -g -std=c++23 -MMD -MP -fPIE -I./include $(shell pkg-config --cflags freetype2 miniz 2>/dev/null)
 CFLAGS   = -g -MMD -MP -fPIE -I./include
 
-LINUX_LDFLAGS        = -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet -lminiz $(shell pkg-config --libs freetype2 miniz 2>/dev/null)
-LINUX_SERVER_LDFLAGS = -ldl -llua -lpthread -lm -lenet -lminiz $(shell pkg-config --libs miniz 2>/dev/null)
-LINUX_TOOL_LDFLAGS   = -lglfw -lGL -ldl -llua -lpthread -lm -lminiz $(shell pkg-config --libs freetype2 miniz 2>/dev/null)
+LINUX_LDFLAGS        = -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet $(shell pkg-config --libs freetype2 miniz 2>/dev/null)
+LINUX_SERVER_LDFLAGS = -ldl -llua -lpthread -lm -lenet $(shell pkg-config --libs miniz 2>/dev/null)
+LINUX_TOOL_LDFLAGS   = -lglfw -lGL -ldl -llua -lpthread -lm $(shell pkg-config --libs freetype2 miniz 2>/dev/null)
 
 # ==========================================
 # [2] MinGW-w64 Windows 交叉編譯設定 (Linux 端執行)

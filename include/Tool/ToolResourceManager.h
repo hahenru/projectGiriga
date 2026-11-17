@@ -22,6 +22,7 @@ public:
     // --- Shader ---
     Shader& loadShader(const std::string& name, const std::string& vertPath, const std::string& fragPath);
     Shader& getShader(const std::string& name);
+	Shader& getOrLoadShader(const std::string& name, const std::string& vertPath, const std::string& fragPath) override;
 
     // --- Font ---
     void registerFontPath(const std::string& name, const std::vector<std::string>& candidates, unsigned int defaultSize = 48);

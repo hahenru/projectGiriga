@@ -4,8 +4,10 @@
 #include <Core/Identifiable.h>
 #include <UI/UIContainer.h>
 #include <UI/UIFactory.h>
-#include <UI/UIConsole.h>
-#include <UI/UISettingsMenu.h>
+#ifndef GIRIGARA_TOOL
+	#include <UI/UIConsole.h>
+	#include <UI/UISettingsMenu.h>
+#endif//GIRIGARA_TOOL
 #include <Renderer/UIRenderer.h>
 #include <Resource/IResourceManager.h>
 #include <Event/EventBus.h>
@@ -38,9 +40,9 @@ public:
     UIManager(const UIManager&) = delete;
     UIManager& operator=(const UIManager&) = delete;
 
+
     void toggleConsole();
     void toggleSettingsMenu();
-    UIConsole* getConsole() { return m_console; }
     UIContainer& getRootUI() { return m_rootUI; }
     UIFactory& getFactory() { return m_factory; }
 
@@ -69,9 +71,10 @@ private:
     UIContainer m_rootUI;                                   // 1) 全局持久層 (Console, Toast 等)
     std::unique_ptr<UIContainer> m_activeSceneUI{nullptr};  // 2) 當前場景 UI 樹 (由 Event 注入)
     std::vector<DyingUIEntry> m_dyingSceneUI;               // 3) 延遲消亡隊列
-
+#ifndef GIRIGARA_TOOL
     UIConsole* m_console{nullptr};
     UISettingsMenu* m_settingsMenu{nullptr};
+#endif
     float m_screenWidth = 800.0f;
     float m_screenHeight = 600.0f;
 };

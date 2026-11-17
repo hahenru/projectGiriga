@@ -128,6 +128,7 @@ bool FileSystem::writeBinary(const std::string& path, const std::vector<uint8_t>
     return out.good();
 }
 
+// @luaFunc RegisterFileDropCallback(callback?: function)
 int FileSystem::lua_RegisterFileDropCallback(lua_State* L) {
     FileSystem* sys = getFileSystemFromLua(L);
     if (!sys) return 0;
@@ -143,6 +144,7 @@ int FileSystem::lua_RegisterFileDropCallback(lua_State* L) {
     return 0;
 }
 
+// @luaFunc FsStatPath(path: string) -> string|nil
 int FileSystem::lua_FsStatPath(lua_State* L) {
     const char* pathStr = luaL_checkstring(L, 1);
     FileSystem* sys = getFileSystemFromLua(L);
@@ -161,6 +163,7 @@ int FileSystem::lua_FsStatPath(lua_State* L) {
     return 1;
 }
 
+// @luaFunc FsReadBinary(path: string) -> string|nil, string?
 int FileSystem::lua_FsReadBinary(lua_State* L) {
     const char* pathStr = luaL_checkstring(L, 1);
     FileSystem* sys = getFileSystemFromLua(L);
@@ -181,6 +184,7 @@ int FileSystem::lua_FsReadBinary(lua_State* L) {
     return 1;
 }
 
+// @luaFunc FsWriteBinary(path: string, data: string) -> boolean
 int FileSystem::lua_FsWriteBinary(lua_State* L) {
     const char* pathStr = luaL_checkstring(L, 1);
     size_t len = 0;

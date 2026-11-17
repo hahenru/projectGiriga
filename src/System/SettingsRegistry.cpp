@@ -30,7 +30,7 @@ namespace {
         return false;
     }
 
-    // ChangeSettingByName("Audio.Volume.BGM", 0.8)
+    // @luaFunc ChangeSettingByName(path: string, value: boolean|integer|number|string) -> boolean
     int lua_ChangeSettingByName(lua_State* L) {
         SettingsRegistry* settings = getSettingsFromLua(L);
         if (!settings) return 0;
@@ -43,7 +43,7 @@ namespace {
         return 1;
     }
 
-    // ChangeSettingByUUID(uuid, 0.8)
+    // @luaFunc ChangeSettingByUUID(uuid: integer, value: boolean|integer|number|string) -> boolean
     int lua_ChangeSettingByUUID(lua_State* L) {
         SettingsRegistry* settings = getSettingsFromLua(L);
         if (!settings) return 0;
@@ -56,7 +56,7 @@ namespace {
         return 1;
     }
 
-    // SetSettingEnabled(uuid, enabled)
+    // @luaFunc SetSettingEnabled(uuid: integer, enabled: boolean)
     int lua_SetSettingEnabled(lua_State* L) {
         SettingsRegistry* settings = getSettingsFromLua(L);
         if (!settings) return 0;

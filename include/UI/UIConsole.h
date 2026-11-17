@@ -17,6 +17,10 @@
 
 class UIConsole : public UIContainer {
 public:
+	static constexpr const char* kDefaultShaderName = "ConsoleBackground";
+    static constexpr const char* kDefaultVertPath   = "./assets/shaders/console_bg.vert";
+    static constexpr const char* kDefaultFragPath   = "./assets/shaders/console_bg.frag";
+	
     UIConsole(float x, float y, float width, float height,
               EventBus& eventBus,
               ConsoleSystem& consoleSystem, LoggerSystem& logger,
@@ -26,9 +30,11 @@ public:
     UIConsole(float x, float y, float width, float height,
               EventBus& eventBus,
               ConsoleSystem& consoleSystem, LoggerSystem& logger,
-              IResourceManager& resourceManager);
+              IResourceManager& resourceManager,
+              const std::string& vertPath = kDefaultVertPath,
+              const std::string& fragPath = kDefaultFragPath);
 
-    ~UIConsole() override = default;
+    ~UIConsole() override;
 
     void setSize(float width, float height);
     void layoutChildren(float width, float height);

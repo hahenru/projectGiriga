@@ -50,7 +50,7 @@ namespace {
         return nullptr;
     }
 
-    // 1. BindUIUpdate(elementPtr, function(self, dt) ... end)
+    // @luaFunc BindUIUpdate(element: lightuserdata, callback: function)
     int lua_BindUIUpdate(lua_State* L) {
         auto* element = static_cast<UIElement*>(lua_touserdata(L, 1));
         if (!element || !lua_isfunction(L, 2)) {
@@ -61,7 +61,7 @@ namespace {
         return 0;
     }
 
-    // 2. UI_SetPosition(elementPtr, x, y)
+    // @luaFunc UI_SetPosition(element: lightuserdata, x: number, y: number)
     int lua_UI_SetPosition(lua_State* L) {
         auto* element = static_cast<UIElement*>(lua_touserdata(L, 1));
         float x = static_cast<float>(luaL_checknumber(L, 2));
@@ -72,7 +72,7 @@ namespace {
         return 0;
     }
 
-    // 3. FindUI("InGameConsole")
+    // @luaFunc FindUI(name: string) -> lightuserdata|nil
     int lua_FindUI(lua_State* L) {
         const char* name = luaL_checkstring(L, 1);
         UIManager* mgr = getUIManagerFromLua(L);
@@ -85,7 +85,7 @@ namespace {
         return 1;
     }
 
-    // 4. GetUIByUUID(id)
+    // @luaFunc GetUIByUUID(id: integer) -> lightuserdata|nil
     int lua_GetUIByUUID(lua_State* L) {
         uint64_t id = static_cast<uint64_t>(luaL_checkinteger(L, 1));
         UIManager* mgr = getUIManagerFromLua(L);
@@ -98,7 +98,7 @@ namespace {
         return 1;
     }
 
-    // 5. UI_GetUUID(elementPtr)
+    // @luaFunc UI_GetUUID(element: lightuserdata) -> integer|nil
     int lua_UI_GetUUID(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         if (elem) {
@@ -109,7 +109,7 @@ namespace {
         return 1;
     }
 
-    // 6. UI_GetName(elementPtr)
+    // @luaFunc UI_GetName(element: lightuserdata) -> string|nil
     int lua_UI_GetName(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         if (elem) {
@@ -120,7 +120,7 @@ namespace {
         return 1;
     }
 
-    // 7. UI_SetVisible(elementPtr, visible)
+    // @luaFunc UI_SetVisible(element: lightuserdata, visible: boolean)
     int lua_UI_SetVisible(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         bool visible = lua_toboolean(L, 2) != 0;
@@ -130,28 +130,28 @@ namespace {
         return 0;
     }
 
-    // 8. UI_GetX(elem)
+    // @luaFunc UI_GetX(elem: lightuserdata) -> number
     int lua_UI_GetX(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         lua_pushnumber(L, static_cast<lua_Number>(elem ? elem->getX() : 0.0f));
         return 1;
     }
 
-    // 9. UI_GetY(elem)
+    // @luaFunc UI_GetY(elem: lightuserdata) -> number
     int lua_UI_GetY(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         lua_pushnumber(L, static_cast<lua_Number>(elem ? elem->getY() : 0.0f));
         return 1;
     }
 
-    // 10. UI_IsDragging(elem)
+    // @luaFunc UI_IsDragging(elem: lightuserdata) -> boolean
     int lua_UI_IsDragging(lua_State* L) {
         auto* win = dynamic_cast<UIWindow*>(static_cast<UIElement*>(lua_touserdata(L, 1)));
         lua_pushboolean(L, (win && win->isDragging()) ? 1 : 0);
         return 1;
     }
 
-    // 12. SetPositionPercent(elem, xPercent, yPercent)
+    // @luaFunc SetPositionPercent(elem: lightuserdata, xPercent: number, yPercent: number)
     int lua_UI_SetPositionPercent(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         float x = static_cast<float>(luaL_checknumber(L, 2));
@@ -162,7 +162,7 @@ namespace {
         return 0;
     }
 
-    // 13. UI_OnClick(buttonPtr, function() ... end)
+    // @luaFunc UI_OnClick(button: lightuserdata, callback: function)
     int lua_UI_OnClick(lua_State* L) {
         auto* btn = dynamic_cast<UIButton*>(static_cast<UIElement*>(lua_touserdata(L, 1)));
         if (!btn || !lua_isfunction(L, 2)) {
@@ -180,7 +180,7 @@ namespace {
         return 0;
     }
 
-    // 14. UI_GetText(inputOrTextPtr) -> string
+    // @luaFunc UI_GetText(elem: lightuserdata) -> string
     int lua_UI_GetText(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         if (auto* input = dynamic_cast<UIInputField*>(elem)) {
@@ -195,7 +195,7 @@ namespace {
         return 1;
     }
 
-    // 15. UI_SetText(inputOrTextOrBtnPtr, str)
+    // @luaFunc UI_SetText(elem: lightuserdata, str: string)
     int lua_UI_SetText(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         const char* str = luaL_checkstring(L, 2);
@@ -212,7 +212,7 @@ namespace {
         return 0;
     }
 
-    // 16. UI_SetButtonLocked(buttonPtr, locked)
+    // @luaFunc UI_SetButtonLocked(button: lightuserdata, locked: boolean)
     int lua_UI_SetButtonLocked(lua_State* L) {
         auto* btn = dynamic_cast<UIButton*>(static_cast<UIElement*>(lua_touserdata(L, 1)));
         bool locked = lua_toboolean(L, 2) != 0;
@@ -222,7 +222,7 @@ namespace {
         return 0;
     }
 
-    // 17. UI_SetFontSize(elem, fontSize)
+    // @luaFunc UI_SetFontSize(elem: lightuserdata, fontSize: integer)
     int lua_UI_SetFontSize(lua_State* L) {
         auto* elem = static_cast<UIElement*>(lua_touserdata(L, 1));
         unsigned int sz = static_cast<unsigned int>(luaL_checkinteger(L, 2));
@@ -236,7 +236,7 @@ namespace {
         return 0;
     }
 
-    // 18. UI_GetScreenSize() -> width, height
+    // @luaFunc UI_GetScreenSize() -> number, number
     int lua_UI_GetScreenSize(lua_State* L) {
         UIManager* mgr = getUIManagerFromLua(L);
         if (mgr) {
@@ -272,7 +272,7 @@ namespace {
         return props;
     }
 
-    // CreateUI("Button", { x = 100, y = 200, w = 160, h = 40, text = "Start" })
+    // @luaFunc CreateUI(typeName: string, props?: table, parent?: lightuserdata) -> lightuserdata|nil
     int lua_CreateUI(lua_State* L) {
         const char* typeName = luaL_checkstring(L, 1);
         UIPropMap props = (lua_gettop(L) >= 2) ? parsePropMapFromLuaTable(L, 2) : UIPropMap{};
@@ -305,6 +305,7 @@ UIManager::UIManager(Shader& uiShader,
     m_rootUI.setSize(screenWidth, screenHeight);
     m_rootUI.setPassThrough(true);
 
+#ifndef GIRIGARA_TOOL
     // 1. 掛載設定選單 (先於 Console，確保 Console 絕對置頂)
     m_settingsMenu = m_rootUI.emplaceChild<UISettingsMenu>(
         0.0f, 0.0f,
@@ -331,6 +332,11 @@ UIManager::UIManager(Shader& uiShader,
         GLFW_KEY_ESCAPE, 0,
         [this]() { toggleSettingsMenu(); }
     );
+#else
+	(void)keyboard;
+    (void)console;
+    (void)logger;
+#endif
 
     bindEvents();
     registerScriptBindings();
@@ -343,6 +349,7 @@ UIManager::~UIManager() {
 }
 
 void UIManager::toggleSettingsMenu() {
+#ifndef GIRIGARA_TOOL
     if (!m_settingsMenu) return;
 
     // ★ 防禦 1：如果 Console 正開著，ESC 的優先權是關閉 Console，不觸發設定選單
@@ -362,6 +369,7 @@ void UIManager::toggleSettingsMenu() {
             m_rootUI.setFocusedElement(nullptr);
         }
     }
+#endif
 }
 
 void UIManager::onWindowResize(float width, float height) {
@@ -370,19 +378,21 @@ void UIManager::onWindowResize(float width, float height) {
     m_renderer.setScreenSize(width, height);
     m_rootUI.setSize(width, height);
 
-    // ★ 關鍵：視窗縮放時，Console 同步更新為 100% 全螢幕高
+	#ifndef GIRIGARA_TOOL
     if (m_console) {
         m_console->setSize(width, height);
     }
+	#endif
 
     if (m_activeSceneUI) {
         m_activeSceneUI->setSize(width, height);
     }
-
+	#ifndef GIRIGARA_TOOL
     if (m_settingsMenu) {
         m_settingsMenu->setPosition(0.0f, 0.0f);
         m_settingsMenu->setSize(width, height);
     }
+	#endif
 }
 
 void UIManager::bindEvents() {
@@ -434,6 +444,7 @@ void UIManager::bindEvents() {
 }
 
 void UIManager::toggleConsole() {
+#ifndef GIRIGARA_TOOL
     if (!m_console) return;
     bool next = !m_console->isVisible();
     m_console->setVisible(next);
@@ -450,6 +461,7 @@ void UIManager::toggleConsole() {
             input->setFocused(false);
         }
     }
+#endif
 }
 
 

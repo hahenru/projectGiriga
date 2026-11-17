@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <Resource/IResource.h>
 
+class Shader;
+
 class IResourceManager {
 public:
     virtual ~IResourceManager() = default;
@@ -26,6 +28,12 @@ public:
         return hasInternal(std::type_index(typeid(T)), name);
     }
 
+	virtual Shader& getOrLoadShader(const std::string& name,
+                                    const std::string& vertPath,
+                                    const std::string& fragPath) {
+        throw std::runtime_error("[IResourceManager] Shader loading is not supported: " + name);
+    }
+	
     // 統一使用 std::type_index 傳值
     virtual bool reload(std::type_index type, const std::string& name) = 0;
 

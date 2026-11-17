@@ -50,6 +50,11 @@ Shader& ClientResourceManager::getShader(const std::string& name) {
     return get<Shader>(name);
 }
 
+Shader& ClientResourceManager::getOrLoadShader(const std::string& name,
+                            const std::string& vertPath,
+                            const std::string& fragPath) {
+        return loadShader(name, vertPath, fragPath);
+    }
 // --- Font 載入實作 ---
 void ClientResourceManager::registerFontPath(const std::string& name, const std::vector<std::string>& candidates, unsigned int defaultSize) {
     m_fontConfigs[name] = FontConfig{ candidates, defaultSize };

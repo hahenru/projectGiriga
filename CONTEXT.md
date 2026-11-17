@@ -32,6 +32,7 @@
   - 已註冊 Lua API：`GpkPackDirectory`、`GpkPackFiles`、`GpkList`、`GpkExtractAll`、`OpenFolderDialog`、`OpenFileDialog`，以及視窗拖放全域回呼 `OnFileDrop(paths)`。
 - **更多詳細lua綁定函數**
   - 上述並沒有完整陳述全部的可用函數，必要時候應該詢問使用`make stub`生成一個lua api map。
+  - 如果可以，盡可能引導將Binder函數寫到ModuleNameBinder.cpp，並存放在./scr/Binder/底下
  
 ## 4. 協作輸出規範
 - 修改既有檔案時請直接提供精準的局部修改區塊或完整函式，避免每次貼出整份數百行無關程式碼，並嚴格對齊上述架構與命名風格。

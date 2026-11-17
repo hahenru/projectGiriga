@@ -35,7 +35,6 @@ void ToolRuntime::initSubsystems() {
 
     // 3. 載入 UI 與 Console 背景 Shader，並配置給視窗投影
     m_uiShader = &m_context->toolResources->loadShader("ui", "./assets/shaders/ui.vert", "./assets/shaders/ui.frag");
-    m_context->toolResources->loadShader("ConsoleBackground", "./assets/shaders/console_bg.vert", "./assets/shaders/console_bg.frag");
 
     m_context->window->setShader(m_uiShader);
     m_context->window->updateProjection(fbWidth, fbHeight);

@@ -9,7 +9,7 @@ extern "C" {
 
 namespace {
     constexpr const char* LOGGER_REGISTRY_KEY = "GIRIGARA_LOGGER_INSTANCE";
-
+	// @luaFunc EngineLog(msg: string)
     int lua_EngineLog(lua_State* L) {
         const char* msg = luaL_checkstring(L, 1);
         if (!msg) return 0;
