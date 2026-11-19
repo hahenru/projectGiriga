@@ -13,7 +13,7 @@ public:
 
     void onEnter() override;
     void onExit() override;
-    void update(float dt) override;
+    void update(const SceneClock& clock) override;
 #ifndef GIRIGARA_SERVER
     std::unique_ptr<UIContainer> createUI() override;
 #endif

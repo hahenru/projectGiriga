@@ -2,11 +2,23 @@
 #include <Event/Event.h>
 #include <utility>
 
-ScriptEngine::ScriptEngine(EventBus& eventBus)
-: m_eventBus(eventBus) {
+namespace {
+    template <typename T>
+    bool isEventMainThreadOnly(const T& e) {
+        if constexpr (requires { e.mainThreadOnly; }) {
+            return e.mainThreadOnly;
+        } else {
+            return false;
+        }
+    }
+}
+
+ScriptEngine::ScriptEngine(EventBus& eventBus, ScriptDomain domain)
+    : m_eventBus(eventBus),
+      m_domain(domain) {
     m_L = luaL_newstate();
     if (m_L) {
-        luaL_openlibs(m_L); // 開啟標準函式庫
+        luaL_openlibs(m_L);
         bindEvents();
     } else {
         std::cerr << "[ScriptEngine] Failed to initialize Lua state.\n";
@@ -17,55 +29,86 @@ ScriptEngine::~ScriptEngine() {
     release();
 }
 
-void ScriptEngine::bindEvents() {
-    // 1. 接收各子系統推送過來的 Lua 函式綁定
-    m_eventBus.subscribe<RegisterScriptBindingEvent>([this](RegisterScriptBindingEvent& e) {
-        if (!m_L) return;
+std::unique_ptr<ScriptEngine> ScriptEngine::fork(ScriptDomain targetDomain) const {
+    auto child = std::make_unique<ScriptEngine>(m_eventBus, targetDomain);
 
-        // 存入子系統實體指標至 Lua Registry（供靜態 lua_CFunction 取回 this）
-        if (!e.registryKey.empty() && e.instancePtr) {
-            lua_pushstring(m_L, e.registryKey.c_str());
-            lua_pushlightuserdata(m_L, e.instancePtr);
-            lua_settable(m_L, LUA_REGISTRYINDEX);
-        }
+    // 鎖住母體快照，將已註冊的 C++ 綁定複製給子 VM（子 VM 內部會自動過濾 mainThreadOnly）
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
+    for (const auto& [providerId, record] : m_boundModules) {
+        child->applyModuleBinding(providerId, record);
+    }
 
-        // 註冊所有推送的 C 函式並記錄名稱，供日後解除綁定使用
-        auto& record = m_boundModules[e.providerId];
-        record.registryKey = e.registryKey;
+    return child;
+}
 
-        for (const auto& fn : e.functions) {
+void ScriptEngine::applyModuleBinding(Depersonalization providerId, const BoundModuleRecord& record) {
+    if (!m_L) return;
+    if (record.mainThreadOnly && m_domain != ScriptDomain::MainThread) {
+        return; // WorkerThread 子 VM 自動屏蔽操作 UI / 音訊的綁定
+    }
+
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
+
+    if (!record.registryKey.empty() && record.instancePtr) {
+        lua_pushstring(m_L, record.registryKey.c_str());
+        lua_pushlightuserdata(m_L, record.instancePtr);
+        lua_settable(m_L, LUA_REGISTRYINDEX);
+    }
+
+    for (const auto& fn : record.functions) {
+        if (fn.func) {
             lua_register(m_L, fn.name.c_str(), fn.func);
-            record.funcNames.push_back(fn.name);
         }
+    }
+
+    m_boundModules[providerId] = record;
+}
+
+void ScriptEngine::removeModuleBinding(Depersonalization providerId) {
+    if (!m_L) return;
+
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
+
+    auto it = m_boundModules.find(providerId);
+    if (it == m_boundModules.end()) return;
+
+    for (const auto& fn : it->second.functions) {
+        lua_pushnil(m_L);
+        lua_setglobal(m_L, fn.name.c_str());
+    }
+
+    if (!it->second.registryKey.empty()) {
+        lua_pushstring(m_L, it->second.registryKey.c_str());
+        lua_pushnil(m_L);
+        lua_settable(m_L, LUA_REGISTRYINDEX);
+    }
+
+    m_boundModules.erase(it);
+}
+
+void ScriptEngine::bindEvents() {
+    m_eventBus.subscribe<RegisterScriptBindingEvent>([this](RegisterScriptBindingEvent& e) {
+        BoundModuleRecord record;
+        record.registryKey = e.registryKey;
+        record.instancePtr = e.instancePtr;
+        record.mainThreadOnly = isEventMainThreadOnly(e);
+        record.functions.reserve(e.functions.size());
+        for (const auto& fn : e.functions) {
+            record.functions.push_back({ fn.name, fn.func });
+        }
+
+        applyModuleBinding(e.providerId, record);
     }, m_id);
 
-    // 2. 接收子系統的解除綁定請求（模組卸載或切換場景時）
     m_eventBus.subscribe<UnregisterScriptBindingEvent>([this](UnregisterScriptBindingEvent& e) {
-        if (!m_L) return;
-
-        auto it = m_boundModules.find(e.providerId);
-        if (it == m_boundModules.end()) return;
-
-        // 將 Lua 全域環境中的對應函式設為 nil
-        for (const auto& fnName : it->second.funcNames) {
-            lua_pushnil(m_L);
-            lua_setglobal(m_L, fnName.c_str());
-        }
-
-        // 清除 Lua Registry 中的指標
-        if (!it->second.registryKey.empty()) {
-            lua_pushstring(m_L, it->second.registryKey.c_str());
-            lua_pushnil(m_L);
-            lua_settable(m_L, LUA_REGISTRYINDEX);
-        }
-
-        m_boundModules.erase(it);
+        removeModuleBinding(e.providerId);
     }, m_id);
 }
 
 void ScriptEngine::release() {
-    // 先向 EventBus 退訂自身監聽器，防止關閉後仍有事件打進來
     m_eventBus.unsubscribeByOwner(m_id);
+
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
     m_boundModules.clear();
 
     if (m_L) {
@@ -83,7 +126,9 @@ void ScriptEngine::reportErrors(int status) {
 }
 
 bool ScriptEngine::executeFile(const std::string& filepath) {
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
     if (!m_L) return false;
+
     int status = luaL_dofile(m_L, filepath.c_str());
     if (status != LUA_OK) {
         reportErrors(status);
@@ -93,7 +138,9 @@ bool ScriptEngine::executeFile(const std::string& filepath) {
 }
 
 bool ScriptEngine::executeString(const std::string& code) {
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
     if (!m_L) return false;
+
     int status = luaL_dostring(m_L, code.c_str());
     if (status != LUA_OK) {
         reportErrors(status);
@@ -103,7 +150,9 @@ bool ScriptEngine::executeString(const std::string& code) {
 }
 
 bool ScriptEngine::callFunction(const std::string& funcName) {
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
     if (!m_L) return false;
+
     lua_getglobal(m_L, funcName.c_str());
     if (!lua_isfunction(m_L, -1)) {
         lua_pop(m_L, 1);
@@ -119,6 +168,9 @@ bool ScriptEngine::callFunction(const std::string& funcName) {
 }
 
 bool ScriptEngine::executeResource(const ScriptResource& script) {
+    std::lock_guard<std::recursive_mutex> lock(m_luaMutex);
+    if (!m_L) return false;
+
     int status = luaL_loadbuffer(m_L, script.getCode().c_str(), script.getCode().size(), script.getPath().c_str());
     if (status != LUA_OK) {
         reportErrors(status);

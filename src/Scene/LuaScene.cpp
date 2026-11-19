@@ -32,12 +32,14 @@ void LuaScene::onExit() {
     m_ctx.scriptEngine->callFunction("OnSceneExit");
 }
 
-void LuaScene::update(float dt) {
+void LuaScene::update(const SceneClock& clock) {
+    if (clock.sceneDt <= 0.0f && clock.isPaused) return;
+
     lua_State* L = m_ctx.scriptEngine->getRawState();
     if (L) {
         lua_getglobal(L, "OnSceneUpdate");
         if (lua_isfunction(L, -1)) {
-            lua_pushnumber(L, static_cast<lua_Number>(dt));
+            lua_pushnumber(L, static_cast<lua_Number>(clock.sceneDt));
             if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
                 const char* err = lua_tostring(L, -1);
                 m_ctx.logger->error(std::string("[LuaScene Update 錯誤] ") + (err ? err : "Unknown"));

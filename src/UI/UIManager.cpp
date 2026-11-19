@@ -291,52 +291,25 @@ namespace {
 
 UIManager::UIManager(Shader& uiShader,
                      EventBus& eventBus,
-                     KeyboardSystem& keyboard,
-                     ConsoleSystem& console,
-                     LoggerSystem& logger,
                      IResourceManager& resources,
                      float screenWidth, float screenHeight)
-                         : m_renderer(uiShader, screenWidth, screenHeight),
-                           m_eventBus(eventBus),
-                           m_resources(resources),
-                           m_screenWidth(screenWidth),
-                           m_screenHeight(screenHeight) {
-    m_rootUI.setPosition(0.0f, 0.0f);
-    m_rootUI.setSize(screenWidth, screenHeight);
-    m_rootUI.setPassThrough(true);
+    : m_renderer(uiShader, screenWidth, screenHeight),
+      m_eventBus(eventBus),
+      m_resources(resources),
+      m_screenWidth(screenWidth),
+      m_screenHeight(screenHeight) {
 
-#ifndef GIRIGARA_TOOL
-    // 1. 掛載設定選單 (先於 Console，確保 Console 絕對置頂)
-    m_settingsMenu = m_rootUI.emplaceChild<UISettingsMenu>(
-        0.0f, 0.0f,
-        screenWidth, screenHeight,
-        m_resources, m_eventBus
-    );
+    // 預先建立一個空的預設場景容器，確保任何時候呼叫 CreateUI 都不會誤塞進 m_overlayUI
+    m_activeSceneUI = std::make_unique<UIContainer>(0.0f, 0.0f, screenWidth, screenHeight);
+    m_activeSceneUI->setPassThrough(true);
 
-    // 2. 掛載 Console
-    m_console = m_rootUI.emplaceChild<UIConsole>(
-        0.0f, 0.0f, screenWidth, screenHeight,
-        m_eventBus, console, logger, m_resources
-    );
-    m_console->setName("InGameConsole");
-    m_console->setVisible(false);
+    m_overlayUI.setPosition(0.0f, 0.0f);
+    m_overlayUI.setSize(screenWidth, screenHeight);
+    m_overlayUI.setPassThrough(true);
 
-    // 3. 註冊波浪鍵呼叫 Console
-    keyboard.registerShortcut(
-        GLFW_KEY_GRAVE_ACCENT, 0,
-        [this]() { toggleConsole(); }
-    );
-
-    // 4. ★ 註冊 ESC 呼叫設定選單 (由 UIManager 統一管理層級優先權)
-    keyboard.registerShortcut(
-        GLFW_KEY_ESCAPE, 0,
-        [this]() { toggleSettingsMenu(); }
-    );
-#else
-	(void)keyboard;
-    (void)console;
-    (void)logger;
-#endif
+    m_popupUI.setPosition(0.0f, 0.0f);
+    m_popupUI.setSize(screenWidth, screenHeight);
+    m_popupUI.setPassThrough(true);
 
     bindEvents();
     registerScriptBindings();
@@ -348,51 +321,37 @@ UIManager::~UIManager() {
     unregisterScriptBindings();
 }
 
-void UIManager::toggleSettingsMenu() {
-#ifndef GIRIGARA_TOOL
-    if (!m_settingsMenu) return;
-
-    // ★ 防禦 1：如果 Console 正開著，ESC 的優先權是關閉 Console，不觸發設定選單
-    if (m_console && m_console->isVisible()) {
-        toggleConsole();
-        return;
+void UIManager::addOverlay(std::unique_ptr<UIElement> overlay) {
+    if (overlay) {
+        m_overlayUI.addChild(std::move(overlay));
     }
+}
 
-    // ★ 防禦 2：正常切換設定選單開關
-    bool next = !m_settingsMenu->isVisible();
-    m_settingsMenu->setVisible(next);
-
-    if (next) {
-        m_rootUI.setFocusedElement(m_settingsMenu);
-    } else {
-        if (m_rootUI.getFocusedElement() == m_settingsMenu) {
-            m_rootUI.setFocusedElement(nullptr);
-        }
+void UIManager::bringOverlayToFront(UIElement* overlay) {
+    if (overlay) {
+        m_overlayUI.bringToFront(overlay);
+        m_overlayUI.setFocusedElement(overlay);
     }
-#endif
 }
 
 void UIManager::onWindowResize(float width, float height) {
     m_screenWidth = width;
     m_screenHeight = height;
     m_renderer.setScreenSize(width, height);
-    m_rootUI.setSize(width, height);
-
-	#ifndef GIRIGARA_TOOL
-    if (m_console) {
-        m_console->setSize(width, height);
-    }
-	#endif
 
     if (m_activeSceneUI) {
         m_activeSceneUI->setSize(width, height);
     }
-	#ifndef GIRIGARA_TOOL
-    if (m_settingsMenu) {
-        m_settingsMenu->setPosition(0.0f, 0.0f);
-        m_settingsMenu->setSize(width, height);
+
+    m_overlayUI.setSize(width, height);
+    for (auto& child : m_overlayUI.getChildren()) {
+        // 全螢幕覆蓋型元件（如 Console、全螢幕設定頁）自動同步縮放
+        if (child && child->getLocalX() == 0.0f && child->getLocalY() == 0.0f) {
+            child->setSize(width, height);
+        }
     }
-	#endif
+
+    m_popupUI.setSize(width, height);
 }
 
 void UIManager::bindEvents() {
@@ -403,11 +362,12 @@ void UIManager::bindEvents() {
         }
 
         m_activeSceneUI = std::move(e.uiTree);
-        if (m_activeSceneUI) {
-            m_activeSceneUI->setPosition(0.0f, 0.0f);
-            m_activeSceneUI->setSize(m_screenWidth, m_screenHeight);
-            m_activeSceneUI->setPassThrough(true); // 場景根容器也是穿透的
+        if (!m_activeSceneUI) {
+            m_activeSceneUI = std::make_unique<UIContainer>(0.0f, 0.0f, m_screenWidth, m_screenHeight);
         }
+        m_activeSceneUI->setPosition(0.0f, 0.0f);
+        m_activeSceneUI->setSize(m_screenWidth, m_screenHeight);
+        m_activeSceneUI->setPassThrough(true);
     }, getID());
 
     // B. 視窗縮放事件
@@ -415,26 +375,28 @@ void UIManager::bindEvents() {
         onWindowResize(static_cast<float>(e.width), static_cast<float>(e.height));
     }, getID());
 
-    // C. ★ 關鍵修正：滑鼠移動事件派發 (用於按鈕 Hover 更新)
+    // C. 滑鼠移動事件派發（由頂層往下：Popup -> Overlay -> Scene）
     m_eventBus.subscribe<MouseMovedEvent>([this](MouseMovedEvent& e) {
-        // 先由頂層全域 UI 處理 (若 Console 打開且滑鼠在其上，會攔截)
-        bool handled = m_rootUI.handleMouseMove(e.x, e.y);
+        if (m_popupUI.handleMouseMove(e.x, e.y)) return;
+        if (m_overlayUI.handleMouseMove(e.x, e.y)) return;
 
-        // 若全域 UI 沒攔截 (例如 Console 隱藏或滑鼠在 Console 外)，再交給場景 UI
-        if (!handled && m_activeSceneUI && m_activeSceneUI->isVisible()) {
+        if (m_activeSceneUI && m_activeSceneUI->isVisible()) {
             m_activeSceneUI->handleMouseMove(e.x, e.y);
         }
     }, getID());
 
-    // D. ★ 關鍵修正：滑鼠點擊事件派發 (用於按鈕 Click 與輸入框 Focus)
+    // D. 滑鼠點擊事件派發（由頂層往下：Popup -> Overlay -> Scene）
     m_eventBus.subscribePriority<MouseButtonEvent>([this](MouseButtonEvent& e) {
-        // 1. 優先送給頂層全域樹 (Console)
-        if (m_rootUI.handleMouseButton(e.button, e.action, e.mods, e.x, e.y)) {
-            e.isHandled = true; // 被 Console 攔截，底層按鈕絕不觸發
+        if (m_popupUI.handleMouseButton(e.button, e.action, e.mods, e.x, e.y)) {
+            e.isHandled = true;
             return;
         }
 
-        // 2. 全域樹未攔截，送給活躍場景 UI 樹
+        if (m_overlayUI.handleMouseButton(e.button, e.action, e.mods, e.x, e.y)) {
+            e.isHandled = true;
+            return;
+        }
+
         if (m_activeSceneUI && m_activeSceneUI->isVisible()) {
             if (m_activeSceneUI->handleMouseButton(e.button, e.action, e.mods, e.x, e.y)) {
                 e.isHandled = true;
@@ -443,30 +405,9 @@ void UIManager::bindEvents() {
     }, getID());
 }
 
-void UIManager::toggleConsole() {
-#ifndef GIRIGARA_TOOL
-    if (!m_console) return;
-    bool next = !m_console->isVisible();
-    m_console->setVisible(next);
-
-    if (next) {
-        m_rootUI.setFocusedElement(m_console);
-        if (auto* input = m_console->getInputField()) {
-            input->setFocused(true);
-        }
-    } else {
-        // ★ 關閉時徹底清除焦點，防止幽靈焦點殘留
-        m_rootUI.setFocusedElement(nullptr);
-        if (auto* input = m_console->getInputField()) {
-            input->setFocused(false);
-        }
-    }
-#endif
-}
-
-
 void UIManager::update(float dt) {
-    m_rootUI.update(dt);
+    m_popupUI.update(dt);
+    m_overlayUI.update(dt);
 
     if (m_activeSceneUI) {
         m_activeSceneUI->update(dt);
@@ -486,18 +427,21 @@ void UIManager::update(float dt) {
 void UIManager::render() {
     m_renderer.begin();
 
-    // 1. 先畫即將消亡的場景 UI
+    // 1. 即將消亡的場景 UI
     for (auto& entry : m_dyingSceneUI) {
         entry.tree->render(m_renderer);
     }
 
-    // 2. 再畫當前活躍場景 UI
+    // 2. 當前活躍場景 UI（Lua / 遊戲畫面 UI 永遠被限制在這一層）
     if (m_activeSceneUI && m_activeSceneUI->isVisible()) {
         m_activeSceneUI->render(m_renderer);
     }
 
-    // 3. 最後畫全域層 (Console / Toast 置頂)
-    m_rootUI.render(m_renderer);
+    // 3. 全域覆蓋層（Console、設定選單、開發者視窗永遠蓋在場景 UI 之上）
+    m_overlayUI.render(m_renderer);
+
+    // 4. 最頂層彈出層（右鍵選單等）
+    m_popupUI.render(m_renderer);
 
     m_renderer.end();
 }
@@ -540,14 +484,16 @@ UIElement* UIManager::findElementByName(const std::string& name) {
     if (m_activeSceneUI) {
         if (auto* found = findInTreeByName(*m_activeSceneUI, name)) return found;
     }
-    return findInTreeByName(m_rootUI, name);
+    if (auto* found = findInTreeByName(m_overlayUI, name)) return found;
+    return findInTreeByName(m_popupUI, name);
 }
 
 UIElement* UIManager::findElementByID(uint64_t id) {
     if (m_activeSceneUI) {
         if (auto* found = findInTreeByID(*m_activeSceneUI, id)) return found;
     }
-    return findInTreeByID(m_rootUI, id);
+    if (auto* found = findInTreeByID(m_overlayUI, id)) return found;
+    return findInTreeByID(m_popupUI, id);
 }
 
 UIElement* UIManager::createElement(const std::string& typeName, const UIPropMap& props, UIContainer* parent) {
@@ -559,22 +505,22 @@ UIElement* UIManager::createElement(const std::string& typeName, const UIPropMap
         elem->setName(name);
     }
 
-    // ★ 新增：支援百分比座標與尺寸（例如 xPercent = 5.0, wPercent = 90.0）
     if (props.contains("xPercent") || props.contains("yPercent")) {
         elem->setPositionPercent(
             UIFactory::getFloat(props, "xPercent", 0.0f),
-                                 UIFactory::getFloat(props, "yPercent", 0.0f)
+            UIFactory::getFloat(props, "yPercent", 0.0f)
         );
     }
     if (props.contains("wPercent") || props.contains("hPercent")) {
         elem->setSizePercent(
             UIFactory::getFloat(props, "wPercent", 100.0f),
-                             UIFactory::getFloat(props, "hPercent", 100.0f)
+            UIFactory::getFloat(props, "hPercent", 100.0f)
         );
     }
 
     UIElement* rawPtr = elem.get();
-    UIContainer* target = parent ? parent : (m_activeSceneUI ? m_activeSceneUI.get() : &m_rootUI);
+    // 預設永遠掛進 m_activeSceneUI，絕不落入 m_overlayUI
+    UIContainer* target = parent ? parent : m_activeSceneUI.get();
     target->addChild(std::move(elem));
     return rawPtr;
 }

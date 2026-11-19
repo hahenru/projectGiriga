@@ -1,5 +1,5 @@
 #include <UI/UISettingsMenu.h>
-#include <GLFW/glfw3.h>
+#include <Core/InputCode.h>
 #include <algorithm>
 
 UISettingsMenu::UISettingsMenu(float x, float y, float width, float height,
@@ -218,7 +218,7 @@ void UISettingsMenu::close() { setVisible(false); }
 
 bool UISettingsMenu::handleKey(int key, int scancode, int action, int mods) {
     if (!isVisible()) return false;
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+    if (key == InputCode::KeyEscape && action == InputCode::ActionPress) {
         close();
         return true;
     }

@@ -7,6 +7,8 @@
 #include <Scene/SceneManager.h>
 #include <UI/UIManager.h>
 #include <Shader/Shader.h>
+#include <UI/UIConsole.h>
+#include <UI/UISettingsMenu.h>
 
 class ClientRuntime {
 public:
@@ -33,6 +35,8 @@ private:
     std::unique_ptr<SceneManager> m_sceneManager;
     std::unique_ptr<UIManager> m_uiManager;
     bool m_isRunning{false};
+	UIConsole* m_console{nullptr};
+    UISettingsMenu* m_settingsMenu{nullptr};
 };
 
 #endif // GIRIGARA_CLIENT_CLIENT_RUNTIME_H

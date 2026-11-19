@@ -21,6 +21,7 @@ endif
 # 1. 三端共用核心 (Common - 零網路、零音訊、零視窗依賴)
 COMMON_SRC = \
 	src/Core/CoreContext.cpp \
+	src/System/ThreadPool.cpp \
 	src/System/LoggerSystem.cpp \
 	src/System/ConsoleSystem.cpp \
 	src/System/FileSystem.cpp \
@@ -30,14 +31,15 @@ COMMON_SRC = \
 	src/Script/ScriptEngine.cpp \
 	src/Resource/ScriptResource.cpp \
 	src/Resource/GpkArchive.cpp \
+	src/System/SettingsRegistry.cpp \
 	src/Girigara.cpp \
 	src/main.cpp
 
-# 2. 網路模組 (Net - 供 Client 與 Server 共用，Tool 不編譯)
+# 2. 網路模組 (Net - 供 Client 用，Tool 不編譯)
 NET_SRC = \
 	src/Network/ENetNode.cpp
 
-# 3. 圖形與介面共用層 (GUI Common - 供 Client 與 Tool 共用，Server 不編譯)
+# 3. 圖形與介面共用層 (GUI Common - 供 Client 用，Server 不編譯)
 GUI_COMMON_SRC = \
 	src/glad/glad.c \
 	src/Shader/Shader.cpp \
@@ -64,15 +66,12 @@ GUI_COMMON_SRC = \
 # 4. 客戶端專屬 (Client - 遊戲場景、音訊系統、全域設定表)
 CLIENT_SRC = \
 	$(GUI_COMMON_SRC) \
-	src/Client/ClientContext.cpp \
 	src/Client/ClientResourceManager.cpp \
-	src/Client/ClientRuntime.cpp \
 	src/Scene/MainMenuScene.cpp \
 	src/Scene/GameScene.cpp \
 	src/Audio/AudioSystem.cpp \
 	src/Resource/AudioResource.cpp \
 	src/ThirdParty/miniaudio_impl.cpp \
-	src/System/SettingsRegistry.cpp \
 	src/UI/UISettingsMenu.cpp \
     src/UI/UIConsole.cpp
 
@@ -81,24 +80,13 @@ CLIENT_SRC = \
 
 # 5. 伺服器專屬 (Server - 無頭伺服器與外部設定檔)
 SERVER_SRC = \
-	src/Server/ServerContext.cpp \
 	src/Server/ServerResourceManager.cpp \
-	src/Server/ServerRuntime.cpp \
 	src/Server/ServerConfig.cpp
-
-# 6. 獨立工具專屬 (Tool - 封包管理介面與 GPK Lua 綁定)
-TOOL_SRC = \
-	$(GUI_COMMON_SRC) \
-	src/Tool/ToolContext.cpp \
-	src/Tool/ToolResourceManager.cpp \
-	src/Tool/ToolRuntime.cpp \
-	src/Script/GpkScriptBinder.cpp
 
 # 組合目標原始碼
 ALL_CLIENT_SRC      = $(COMMON_SRC) $(NET_SRC) $(CLIENT_SRC) $(SERVER_SRC)
 ALL_PURE_CLIENT_SRC = $(COMMON_SRC) $(NET_SRC) $(CLIENT_SRC)
 ALL_SERVER_SRC      = $(COMMON_SRC) $(NET_SRC) $(SERVER_SRC)
-ALL_TOOL_SRC        = $(COMMON_SRC) $(TOOL_SRC)
 
 # ==========================================
 # 目錄結構與產出路徑集中定義 (三端完全對稱)
@@ -110,33 +98,27 @@ ASSETS_DIR              = assets
 LINUX_OUT_DIR           = $(ROOT_BUILD_DIR)/linux
 LINUX_CLIENT_OBJ_DIR    = $(LINUX_OUT_DIR)/obj/Client
 LINUX_SERVER_OBJ_DIR    = $(LINUX_OUT_DIR)/obj/Server
-LINUX_TOOL_OBJ_DIR      = $(LINUX_OUT_DIR)/obj/Tool
 
 LINUX_TARGET            = $(LINUX_OUT_DIR)/projectGIRIGARA
 LINUX_SERVER_TARGET     = $(LINUX_OUT_DIR)/projectGIRIGARA_server
-LINUX_TOOL_TARGET       = $(LINUX_OUT_DIR)/projectGIRIGARA_tool
 PACKAGE_LINUX           = $(LINUX_OUT_DIR)/ProjectGirigara_linux.tar.gz
 
 # --- [2] Windows 交叉編譯輸出路徑 (build/win64_cross/) ---
 WIN_CROSS_OUT_DIR       = $(ROOT_BUILD_DIR)/win64_cross
 WIN_CROSS_CLIENT_OBJ_DIR= $(WIN_CROSS_OUT_DIR)/obj/Client
 WIN_CROSS_SERVER_OBJ_DIR= $(WIN_CROSS_OUT_DIR)/obj/Server
-WIN_CROSS_TOOL_OBJ_DIR  = $(WIN_CROSS_OUT_DIR)/obj/Tool
 
 WIN_CROSS_TARGET        = $(WIN_CROSS_OUT_DIR)/projectGIRIGARA.exe
 WIN_CROSS_SERVER_TARGET = $(WIN_CROSS_OUT_DIR)/projectGIRIGARA_server.exe
-WIN_CROSS_TOOL_TARGET   = $(WIN_CROSS_OUT_DIR)/projectGIRIGARA_tool.exe
 PACKAGE_WIN_CROSS       = $(WIN_CROSS_OUT_DIR)/ProjectGirigara_win64_cross.zip
 
 # --- [3] Windows 原生編譯輸出路徑 (build/win64_native/) ---
 WIN_NAT_OUT_DIR         = $(ROOT_BUILD_DIR)/win64_native
 WIN_NAT_CLIENT_OBJ_DIR  = $(WIN_NAT_OUT_DIR)/obj/Client
 WIN_NAT_SERVER_OBJ_DIR  = $(WIN_NAT_OUT_DIR)/obj/Server
-WIN_NAT_TOOL_OBJ_DIR    = $(WIN_NAT_OUT_DIR)/obj/Tool
 
 WIN_NAT_TARGET          = $(WIN_NAT_OUT_DIR)/projectGIRIGARA.exe
 WIN_NAT_SERVER_TARGET   = $(WIN_NAT_OUT_DIR)/projectGIRIGARA_server.exe
-WIN_NAT_TOOL_TARGET     = $(WIN_NAT_OUT_DIR)/projectGIRIGARA_tool.exe
 PACKAGE_WIN_NAT         = $(WIN_NAT_OUT_DIR)/ProjectGirigara_win64_native.zip
 
 # ==========================================
@@ -149,7 +131,6 @@ CFLAGS   = -g -MMD -MP -fPIE -I./include
 
 LINUX_LDFLAGS        = -lglfw -lGL -ldl -llua -lpthread -lasound -lm -lenet $(shell pkg-config --libs freetype2 miniz 2>/dev/null)
 LINUX_SERVER_LDFLAGS = -ldl -llua -lpthread -lm -lenet $(shell pkg-config --libs miniz 2>/dev/null)
-LINUX_TOOL_LDFLAGS   = -lglfw -lGL -ldl -llua -lpthread -lm $(shell pkg-config --libs freetype2 miniz 2>/dev/null)
 
 # ==========================================
 # [2] MinGW-w64 Windows 交叉編譯設定 (Linux 端執行)
@@ -171,10 +152,6 @@ WIN_CROSS_LDFLAGS = -mwindows -Wl,--subsystem,windows $(WIN_CROSS_COMMON_LIBS) \
 WIN_CROSS_SERVER_LDFLAGS = $(WIN_CROSS_COMMON_LIBS) \
                            -llua -lpthread -lenet -lws2_32 -lwinmm -lminiz -lz
 
-WIN_CROSS_TOOL_LDFLAGS = -mwindows -Wl,--subsystem,windows $(WIN_CROSS_COMMON_LIBS) \
-                         -lglfw3 -llua -lopengl32 -lole32 -lfreetype -lpng -lminiz -lz -lbz2 \
-                         -lgdi32 -limm32 -lpthread
-
 # ==========================================
 # [3] 原生 Windows (MinGW-w64) 編譯設定 (Windows 端執行)
 # ==========================================
@@ -190,9 +167,6 @@ WIN_NAT_LDFLAGS = -mwindows -Wl,--subsystem,windows \
 
 WIN_NAT_SERVER_LDFLAGS = -llua -lpthread -lenet -lws2_32 -lwinmm -lminiz
 
-WIN_NAT_TOOL_LDFLAGS = -mwindows -Wl,--subsystem,windows \
-                       -lglfw3 -lopengl32 -llua -lfreetype -lgdi32 -lpthread -lole32 -luuid -lminiz
-
 # ==========================================
 # 目標檔 (.o) 與依賴檔 (.d) 路徑映射
 # ==========================================
@@ -200,26 +174,20 @@ WIN_NAT_TOOL_LDFLAGS = -mwindows -Wl,--subsystem,windows \
 LINUX_CLIENT_OBJS = $(patsubst src/%.cpp, $(LINUX_CLIENT_OBJ_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
                     $(patsubst src/%.c,   $(LINUX_CLIENT_OBJ_DIR)/%.o, $(filter %.c,   $(ALL_CLIENT_SRC)))
 LINUX_SERVER_OBJS = $(patsubst src/%.cpp, $(LINUX_SERVER_OBJ_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
-LINUX_TOOL_OBJS   = $(patsubst src/%.cpp, $(LINUX_TOOL_OBJ_DIR)/%.o,   $(filter %.cpp, $(ALL_TOOL_SRC))) \
-                    $(patsubst src/%.c,   $(LINUX_TOOL_OBJ_DIR)/%.o,   $(filter %.c,   $(ALL_TOOL_SRC)))
 
 # Windows Cross
 WIN_CROSS_CLIENT_OBJS = $(patsubst src/%.cpp, $(WIN_CROSS_CLIENT_OBJ_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
                         $(patsubst src/%.c,   $(WIN_CROSS_CLIENT_OBJ_DIR)/%.o, $(filter %.c,   $(ALL_CLIENT_SRC)))
 WIN_CROSS_SERVER_OBJS = $(patsubst src/%.cpp, $(WIN_CROSS_SERVER_OBJ_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
-WIN_CROSS_TOOL_OBJS   = $(patsubst src/%.cpp, $(WIN_CROSS_TOOL_OBJ_DIR)/%.o,   $(filter %.cpp, $(ALL_TOOL_SRC))) \
-                        $(patsubst src/%.c,   $(WIN_CROSS_TOOL_OBJ_DIR)/%.o,   $(filter %.c,   $(ALL_TOOL_SRC)))
 
 # Windows Native
 WIN_NAT_CLIENT_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_CLIENT_OBJ_DIR)/%.o, $(filter %.cpp, $(ALL_CLIENT_SRC))) \
                       $(patsubst src/%.c,   $(WIN_NAT_CLIENT_OBJ_DIR)/%.o, $(filter %.c,   $(ALL_CLIENT_SRC)))
 WIN_NAT_SERVER_OBJS = $(patsubst src/%.cpp, $(WIN_NAT_SERVER_OBJ_DIR)/%.o, $(filter %.cpp, $(ALL_SERVER_SRC)))
-WIN_NAT_TOOL_OBJS   = $(patsubst src/%.cpp, $(WIN_NAT_TOOL_OBJ_DIR)/%.o,   $(filter %.cpp, $(ALL_TOOL_SRC))) \
-                      $(patsubst src/%.c,   $(WIN_NAT_TOOL_OBJ_DIR)/%.o,   $(filter %.c,   $(ALL_TOOL_SRC)))
 
 DEPS = $(LINUX_CLIENT_OBJS:.o=.d) $(LINUX_SERVER_OBJS:.o=.d) $(LINUX_TOOL_OBJS:.o=.d) \
-       $(WIN_CROSS_CLIENT_OBJS:.o=.d) $(WIN_CROSS_SERVER_OBJS:.o=.d) $(WIN_CROSS_TOOL_OBJS:.o=.d) \
-       $(WIN_NAT_CLIENT_OBJS:.o=.d) $(WIN_NAT_SERVER_OBJS:.o=.d) $(WIN_NAT_TOOL_OBJS:.o=.d)
+       $(WIN_CROSS_CLIENT_OBJS:.o=.d) $(WIN_CROSS_SERVER_OBJS:.o=.d) \
+       $(WIN_NAT_CLIENT_OBJS:.o=.d) $(WIN_NAT_SERVER_OBJS:.o=.d)
 
 # ==========================================
 # 總匯編譯入口
@@ -229,7 +197,7 @@ all: linux-all win64-all flatpak
 # ==========================================
 # [1] Linux 原生建置流程 (build/linux/)
 # ==========================================
-linux-all: linux-client linux-server linux-tool copy_assets_linux package_linux
+linux-all: linux-client linux-server copy_assets_linux package_linux
 linux: linux-client copy_assets_linux package_linux
 
 linux-client: $(LINUX_TARGET)
@@ -254,33 +222,20 @@ $(LINUX_SERVER_OBJ_DIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -DGIRIGARA_SERVER -c $< -o $@
 
-linux-tool: $(LINUX_TOOL_TARGET)
-$(LINUX_TOOL_TARGET): $(LINUX_TOOL_OBJS)
-	@mkdir -p $(dir $@)
-	$(CXX) $(LINUX_TOOL_OBJS) -o $@ $(LINUX_TOOL_LDFLAGS)
-
-$(LINUX_TOOL_OBJ_DIR)/%.o: src/%.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -DGIRIGARA_TOOL -c $< -o $@
-
-$(LINUX_TOOL_OBJ_DIR)/%.o: src/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -DGIRIGARA_TOOL -c $< -o $@
-
 copy_assets_linux:
 	@mkdir -p $(LINUX_OUT_DIR)
 	@rm -rf $(LINUX_OUT_DIR)/$(ASSETS_DIR)
 	@cp -r $(ASSETS_DIR) $(LINUX_OUT_DIR)/
 
-package_linux: $(LINUX_TARGET) $(LINUX_SERVER_TARGET) $(LINUX_TOOL_TARGET) copy_assets_linux
+package_linux: $(LINUX_TARGET) $(LINUX_SERVER_TARGET) copy_assets_linux
 	@echo "==> 打包 Linux 完整發布包至 $(PACKAGE_LINUX) ..."
 	@tar -czf $(PACKAGE_LINUX) -C $(LINUX_OUT_DIR) \
-		$(notdir $(LINUX_TARGET)) $(notdir $(LINUX_SERVER_TARGET)) $(notdir $(LINUX_TOOL_TARGET)) $(ASSETS_DIR)
+		$(notdir $(LINUX_TARGET)) $(notdir $(LINUX_SERVER_TARGET)) $(ASSETS_DIR)
 
 # ==========================================
 # [2] Windows 交叉編譯流程 (build/win64_cross/)
 # ==========================================
-win64-all: win64-client win64-server win64-tool copy_assets_win_cross package_win_cross
+win64-all: win64-client win64-server copy_assets_win_cross package_win_cross
 win64: win64-client copy_assets_win_cross package_win_cross
 
 $(WIN_CROSS_CLIENT_OBJ_DIR)/GirigaraRC.o: Girigara.rc
@@ -309,34 +264,21 @@ $(WIN_CROSS_SERVER_OBJ_DIR)/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
 	$(WIN_CROSS_CXX) $(WIN_CROSS_CXXFLAGS) -DGIRIGARA_SERVER -c $< -o $@
 
-win64-tool: $(WIN_CROSS_TOOL_TARGET)
-$(WIN_CROSS_TOOL_TARGET): $(WIN_CROSS_TOOL_OBJS)
-	@mkdir -p $(dir $@)
-	$(WIN_CROSS_CXX) $(WIN_CROSS_TOOL_OBJS) -o $@ $(WIN_CROSS_TOOL_LDFLAGS)
-
-$(WIN_CROSS_TOOL_OBJ_DIR)/%.o: src/%.cpp
-	@mkdir -p $(dir $@)
-	$(WIN_CROSS_CXX) $(WIN_CROSS_CXXFLAGS) -DGIRIGARA_TOOL -c $< -o $@
-
-$(WIN_CROSS_TOOL_OBJ_DIR)/%.o: src/%.c
-	@mkdir -p $(dir $@)
-	$(WIN_CROSS_CC) $(WIN_CROSS_CFLAGS) -DGIRIGARA_TOOL -c $< -o $@
-
 copy_assets_win_cross:
 	@mkdir -p $(WIN_CROSS_OUT_DIR)
 	@rm -rf $(WIN_CROSS_OUT_DIR)/$(ASSETS_DIR)
 	@cp -r $(ASSETS_DIR) $(WIN_CROSS_OUT_DIR)/
 
-package_win_cross: $(WIN_CROSS_TARGET) $(WIN_CROSS_SERVER_TARGET) $(WIN_CROSS_TOOL_TARGET) copy_assets_win_cross
+package_win_cross: $(WIN_CROSS_TARGET) $(WIN_CROSS_SERVER_TARGET) copy_assets_win_cross
 	@echo "==> 壓縮 Windows 交叉編譯完整發布包至 $(PACKAGE_WIN_CROSS)..."
 	@rm -f $(PACKAGE_WIN_CROSS)
 	@cd $(WIN_CROSS_OUT_DIR) && zip -rq $(notdir $(PACKAGE_WIN_CROSS)) \
-		$(notdir $(WIN_CROSS_TARGET)) $(notdir $(WIN_CROSS_SERVER_TARGET)) $(notdir $(WIN_CROSS_TOOL_TARGET)) $(ASSETS_DIR)
+		$(notdir $(WIN_CROSS_TARGET)) $(notdir $(WIN_CROSS_SERVER_TARGET)) $(ASSETS_DIR)
 
 # ==========================================
 # [3] Windows 原生編譯流程 (build/win64_native/ - Windows CMD 執行)
 # ==========================================
-win64-native-all: win64-native-client win64-native-server win64-native-tool copy_assets_win_nat package_win_nat
+win64-native-all: win64-native-client win64-native-server copy_assets_win_nat package_win_nat
 win64-native: win64-native-client copy_assets_win_nat package_win_nat
 
 $(WIN_NAT_CLIENT_OBJ_DIR)/GirigaraRC.o: Girigara.rc
@@ -367,30 +309,17 @@ $(WIN_NAT_SERVER_OBJ_DIR)/%.o: src/%.cpp
 	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
 	$(WIN_NAT_CXX) $(WIN_NAT_CXXFLAGS) -DGIRIGARA_SERVER -c $< -o $@
 
-win64-native-tool: $(WIN_NAT_TOOL_TARGET)
-$(WIN_NAT_TOOL_TARGET): $(WIN_NAT_TOOL_OBJS)
-	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
-	@echo [LD] 連結工具程式 $@ ...
-	$(WIN_NAT_CXX) $(WIN_NAT_TOOL_OBJS) -o $@ $(WIN_NAT_TOOL_LDFLAGS)
-
-$(WIN_NAT_TOOL_OBJ_DIR)/%.o: src/%.cpp
-	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
-	$(WIN_NAT_CXX) $(WIN_NAT_CXXFLAGS) -DGIRIGARA_TOOL -c $< -o $@
-
-$(WIN_NAT_TOOL_OBJ_DIR)/%.o: src/%.c
-	@if not exist "$(subst /,\,$(dir $@))" mkdir "$(subst /,\,$(dir $@))"
-	$(WIN_NAT_CC) $(WIN_NAT_CFLAGS) -DGIRIGARA_TOOL -c $< -o $@
 
 copy_assets_win_nat:
 	@if not exist "$(subst /,\,$(WIN_NAT_OUT_DIR))" mkdir "$(subst /,\,$(WIN_NAT_OUT_DIR))"
 	@if exist "$(subst /,\,$(WIN_NAT_OUT_DIR)\$(ASSETS_DIR))" rmdir /S /Q "$(subst /,\,$(WIN_NAT_OUT_DIR)\$(ASSETS_DIR))"
 	@xcopy /E /I /Q /Y $(ASSETS_DIR) "$(subst /,\,$(WIN_NAT_OUT_DIR)\$(ASSETS_DIR))" >nul
 
-package_win_nat: $(WIN_NAT_TARGET) $(WIN_NAT_SERVER_TARGET) $(WIN_NAT_TOOL_TARGET) copy_assets_win_nat
+package_win_nat: $(WIN_NAT_TARGET) $(WIN_NAT_SERVER_TARGET) copy_assets_win_nat
 	@echo [PACKAGE] 打包 Windows 原生完整發布包至 $(PACKAGE_WIN_NAT) ...
 	@if exist "$(subst /,\,$(PACKAGE_WIN_NAT))" del /Q "$(subst /,\,$(PACKAGE_WIN_NAT))"
 	@cd $(subst /,\,$(WIN_NAT_OUT_DIR)) && tar -a -c -f "$(notdir $(PACKAGE_WIN_NAT))" \
-		$(notdir $(WIN_NAT_TARGET)) $(notdir $(WIN_NAT_SERVER_TARGET)) $(notdir $(WIN_NAT_TOOL_TARGET)) $(ASSETS_DIR)
+		$(notdir $(WIN_NAT_TARGET)) $(notdir $(WIN_NAT_SERVER_TARGET)) $(ASSETS_DIR)
 	@echo [OK] Windows 原生發布包打包完成！
 
 # ==========================================
@@ -463,17 +392,14 @@ ifeq ($(HOST_OS),Windows)
 	@echo   [單獨元件編譯 - Linux 原生]
 	@echo     make linux-client     - 僅編譯 Linux Client
 	@echo     make linux-server     - 僅編譯 Linux 無頭伺服器
-	@echo     make linux-tool       - 僅編譯 Linux GPK 封包工具
 	@echo.
 	@echo   [單獨元件編譯 - Windows 交叉編譯 (Linux 端執行)]
 	@echo     make win64-client     - 僅編譯 Windows Cross Client (.exe)
 	@echo     make win64-server     - 僅編譯 Windows Cross 無頭伺服器 (.exe)
-	@echo     make win64-tool       - 僅編譯 Windows Cross GPK 封包工具 (.exe)
 	@echo.
 	@echo   [單獨元件編譯 - Windows 原生編譯 (Windows CMD 執行)]
 	@echo     make win64-native-client - 僅編譯 Windows 原生 Client (.exe)
 	@echo     make win64-native-server - 僅編譯 Windows 原生無頭伺服器 (.exe)
-	@echo     make win64-native-tool   - 僅編譯 Windows 原生 GPK 封包工具 (.exe)
 	@echo.
 	@echo   [Linux 系統發行版打包 (v$(VERSION))]
 	@echo     make rpm              - 建置 RPM 套件
@@ -500,17 +426,14 @@ else
 	"  [單獨元件編譯 - Linux 原生]" \
 	"    make linux-client     - 僅編譯 Linux Client" \
 	"    make linux-server     - 僅編譯 Linux 無頭伺服器" \
-	"    make linux-tool       - 僅編譯 Linux GPK 封包工具" \
 	"" \
 	"  [單獨元件編譯 - Windows 交叉編譯 (Linux 端執行)]" \
 	"    make win64-client     - 僅編譯 Windows Cross Client (.exe)" \
 	"    make win64-server     - 僅編譯 Windows Cross 無頭伺服器 (.exe)" \
-	"    make win64-tool       - 僅編譯 Windows Cross GPK 封包工具 (.exe)" \
 	"" \
 	"  [單獨元件編譯 - Windows 原生編譯 (Windows CMD 執行)]" \
 	"    make win64-native-client - 僅編譯 Windows 原生 Client (.exe)" \
 	"    make win64-native-server - 僅編譯 Windows 原生無頭伺服器 (.exe)" \
-	"    make win64-native-tool   - 僅編譯 Windows 原生 GPK 封包工具 (.exe)" \
 	"" \
 	"  [Linux 系統發行版打包 (v$(VERSION))]" \
 	"    make rpm              - 建置 RPM 套件" \
@@ -525,7 +448,7 @@ else
 endif
 
 .PHONY: all \
-        linux-all linux linux-client linux-server linux-tool copy_assets_linux package_linux \
-        win64-all win64 win64-client win64-server win64-tool copy_assets_win_cross package_win_cross \
-        win64-native-all win64-native win64-native-client win64-native-server win64-native-tool copy_assets_win_nat package_win_nat \
+        linux-all linux linux-client linux-server copy_assets_linux package_linux \
+        win64-all win64 win64-client win64-server copy_assets_win_cross package_win_cross \
+        win64-native-all win64-native win64-native-client win64-native-server copy_assets_win_nat package_win_nat \
         rpm flatpak flatpak-install clean tree map help stub

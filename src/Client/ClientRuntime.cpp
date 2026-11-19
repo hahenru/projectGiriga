@@ -45,16 +45,67 @@ void ClientRuntime::initSubsystems() {
     m_sceneManager = std::make_unique<SceneManager>(*m_context);
 
     // 5. 建立 UIManager (會自動在 bindEvents() 訂閱 SceneUIChangedEvent)
-    m_uiManager = std::make_unique<UIManager>(
+	m_uiManager = std::make_unique<UIManager>(
         *m_uiShader,
         *m_context->eventBus,
-        *m_context->keyboard,
-        *m_context->console,
-        *m_context->logger,
         *m_context->clientResources,
         static_cast<float>(fbWidth),
         static_cast<float>(fbHeight)
     );
+	// 6. 掛載 Engine 內建開發者工具：Console 與系統設定視窗
+    const float w = static_cast<float>(fbWidth);
+    const float h = static_cast<float>(fbHeight);
+
+    m_settingsMenu = m_uiManager->emplaceOverlay<UISettingsMenu>(
+        0.0f, 0.0f, w, h,
+        *m_context->clientResources, *m_context->eventBus
+    );
+    m_settingsMenu->setVisible(false);
+
+    m_console = m_uiManager->emplaceOverlay<UIConsole>(
+        0.0f, 0.0f, w, h,
+        *m_context->eventBus, *m_context->console, *m_context->logger, *m_context->clientResources
+    );
+    m_console->setName("InGameConsole");
+    m_console->setVisible(false);
+
+    // 7. 註冊 ~ 鍵呼叫內建 Console（打開時強制置頂）
+    m_context->keyboard->registerShortcut(GLFW_KEY_GRAVE_ACCENT, 0, [this]() {
+        if (!m_console) return;
+        bool next = !m_console->isVisible();
+        m_console->setVisible(next);
+        if (next) {
+            m_uiManager->bringOverlayToFront(m_console);
+            if (auto* input = m_console->getInputField()) {
+                input->setFocused(true);
+            }
+        } else {
+            m_uiManager->getRootUI().setFocusedElement(nullptr);
+            if (auto* input = m_console->getInputField()) {
+                input->setFocused(false);
+            }
+        }
+    });
+
+    // 8. 註冊 ESC 鍵呼叫系統/開發者視窗（Console 開啟時優先關閉 Console）
+    m_context->keyboard->registerShortcut(GLFW_KEY_ESCAPE, 0, [this]() {
+        if (m_console && m_console->isVisible()) {
+            m_console->setVisible(false);
+            m_uiManager->getRootUI().setFocusedElement(nullptr);
+            if (auto* input = m_console->getInputField()) {
+                input->setFocused(false);
+            }
+            return;
+        }
+        if (!m_settingsMenu) return;
+        bool next = !m_settingsMenu->isVisible();
+        m_settingsMenu->setVisible(next);
+        if (next) {
+            m_uiManager->bringOverlayToFront(m_settingsMenu);
+        } else if (m_uiManager->getRootUI().getFocusedElement() == m_settingsMenu) {
+            m_uiManager->getRootUI().setFocusedElement(nullptr);
+        }
+    });
 }
 
 void ClientRuntime::loadSystemScripts(const std::string& directoryPath) {
@@ -99,6 +150,7 @@ void ClientRuntime::run() {
 
         // 1. 輪詢視窗與輸入事件
         m_context->window->pollEvents();
+		m_context->eventBus->dispatchQueued();
 
         // ★ 1.5 輪詢客戶端 ENet 網路封包（非阻塞 0ms）
         if (m_context->network) {

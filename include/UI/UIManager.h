@@ -4,15 +4,9 @@
 #include <Core/Identifiable.h>
 #include <UI/UIContainer.h>
 #include <UI/UIFactory.h>
-#ifndef GIRIGARA_TOOL
-	#include <UI/UIConsole.h>
-	#include <UI/UISettingsMenu.h>
-#endif//GIRIGARA_TOOL
 #include <Renderer/UIRenderer.h>
 #include <Resource/IResourceManager.h>
 #include <Event/EventBus.h>
-#include <System/KeyboardSystem.h>
-#include <System/ConsoleSystem.h>
 #include <System/LoggerSystem.h>
 #include <memory>
 #include <vector>
@@ -29,9 +23,6 @@ class UIManager : public Identifiable {
 public:
     UIManager(Shader& uiShader,
               EventBus& eventBus,
-              KeyboardSystem& keyboard,
-              ConsoleSystem& console,
-              LoggerSystem& logger,
               IResourceManager& resources,
               float screenWidth, float screenHeight);
 
@@ -40,13 +31,20 @@ public:
     UIManager(const UIManager&) = delete;
     UIManager& operator=(const UIManager&) = delete;
 
+    // 通用全域覆蓋層掛載介面（供 Engine 內建 Console、開發者視窗、設定選單使用）
+    template <typename T, typename... Args>
+    T* emplaceOverlay(Args&&... args) {
+        return m_overlayUI.emplaceChild<T>(std::forward<Args>(args)...);
+    }
+    void addOverlay(std::unique_ptr<UIElement> overlay);
+    void bringOverlayToFront(UIElement* overlay);
 
-    void toggleConsole();
-    void toggleSettingsMenu();
-    UIContainer& getRootUI() { return m_rootUI; }
+    // 預留給未來的右鍵選單 / Tooltip 等最頂層彈出物
+    UIContainer& getPopupLayer() { return m_popupUI; }
+    UIContainer& getRootUI() { return m_overlayUI; }
     UIFactory& getFactory() { return m_factory; }
 
-    // 樹狀節點查詢與通用工廠建立（完全解耦具體控制項）
+    // 樹狀節點查詢與通用工廠建立
     UIElement* findElementByName(const std::string& name);
     UIElement* findElementByID(uint64_t id);
     UIElement* createElement(const std::string& typeName, const UIPropMap& props = {}, UIContainer* parent = nullptr);
@@ -67,14 +65,12 @@ private:
     IResourceManager& m_resources;
     UIFactory m_factory;
 
-    // 三棵樹
-    UIContainer m_rootUI;                                   // 1) 全局持久層 (Console, Toast 等)
-    std::unique_ptr<UIContainer> m_activeSceneUI{nullptr};  // 2) 當前場景 UI 樹 (由 Event 注入)
-    std::vector<DyingUIEntry> m_dyingSceneUI;               // 3) 延遲消亡隊列
-#ifndef GIRIGARA_TOOL
-    UIConsole* m_console{nullptr};
-    UISettingsMenu* m_settingsMenu{nullptr};
-#endif
+    // 嚴格分層的四棵樹（由底到頂）
+    std::vector<DyingUIEntry> m_dyingSceneUI;               // 1) 延遲消亡場景 UI
+    std::unique_ptr<UIContainer> m_activeSceneUI{nullptr};  // 2) 當前場景 UI（遊戲/Lua 腳本 UI）
+    UIContainer m_overlayUI;                                // 3) 引擎/系統覆蓋層（Console、開發者視窗、設定選單）
+    UIContainer m_popupUI;                                  // 4) 最頂層彈出層（右鍵選單等）
+
     float m_screenWidth = 800.0f;
     float m_screenHeight = 600.0f;
 };

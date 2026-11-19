@@ -1,5 +1,10 @@
 # ProjectGirigara — 專案架構與開發脈絡
-
+- **專案目標**
+  - **概要** : 實作一套具備「顯示與邏輯解耦」、「多實體原生輸入（Multi-Seat）」與「多場景並行模擬」的雙端（Client / Headless Server）遊戲引擎（Decoupled Multi-Scene & Multi-Input Game Engine）。
+  - **介紹** : 本專案打破傳統遊戲引擎「單一執行個體僅綁定單一輸入焦點與單一主場景」的限制，建立顯示（Presentation）與邏輯模擬（Simulation）完全分離的多對多架構。透過攔截並區分作業系統底層的多組實體鍵盤與滑鼠訊號（Raw Input / Multi-device），引擎允許單一主機同時獨立操控多個角色，無需啟動多個遊戲視窗即可提供原生的本機多人（Local Co-op / Multi-Seat）與連線混合體驗。
+  - **核心特色** : 
+    - 多場景並行與雙端同構（Multi-Scene Concurrency）: 特殊的場景管理器，讓客戶端如同伺服器端一樣，可以同時持有多個場景的實體進行計算、並且改進的dt不與系統全局解綁定，每一個場景單獨計算時間，讓多人遊戲也可以實現時間暫停的技能。
+	- 局部時間軸與獨立步進（Decoupled Local Delta-Time） : 摒棄傳統引擎依賴全域單一 dt（Global Delta-Time）的更新模式，將時間步進下放至各別場景與局部空間。每個場景皆擁有獨立的時間縮放（Time Scale）與累加器，從底層架構上解決了「多人連線與多場景並存下，局部時間暫停（Time-Stop）或慢動作技能會引發全域時間悖論」的難題。
 ## 1. 嚴格 Coding Style 與專案紅線（必須無條件遵守）
 - **標頭與實作分離**：除模板與極短內聯存取器外，盡可能將宣告放在 `include/`（`.h`）、實作分離至 `src/`（`.cpp`），減少編譯耦合。
 - **傳統 Include Guard**：所有 `.h` 標頭檔**必須**使用傳統的 `#ifndef GIRIGARA_MODULE_FILENAME_H` / `#define` / `#endif`（**禁用** `#pragma once`）。
@@ -13,12 +18,12 @@
 ## 2. 技術棧與建置規範
 - **語言與腳本**：C++23 + 原生 Lua 5.x C API（不使用 sol2 / LuaBridge 等第三方 C++ 綁定庫）。
 - **建置系統**：純 GNU `Makefile`（不使用 CMake），`include/` 與 `src/` 嚴格 1:1 目錄對齊。
-- **四端分流建置目標**：
+- **分流建置目標**：
   - `projectGIRIGARA`：預設整合版 Client（含本機 Server 能力）。
   - `Pure Client`：僅連線遠端，無 Server 模組。
   - `projectGIRIGARA_server`：無頭伺服器（定義 `GIRIGARA_SERVER`，零視窗、零音訊、零 OpenGL 依賴，讀取自動生成的 `server.cfg`）。
-  - `projectGIRIGARA_tool`：獨立 GUI 資源封包工具（零網路、零音訊依賴，載入 `assets/scripts/packer_tool.lua`）。
 - **開發與發版環境**：Fedora Linux (KDE Plasma on Wayland, HiDPI)，支援 MinGW-w64 交叉編譯 Windows 版與 Flatpak (`com.hahenru.girigara`) 打包。
+- **專案架構設計** : 絕不使用ECS架構，盡可能使用傳統OOP，並在必要時刻說明如果引入ECS會對該目標有什麼好處
 
 ## 3. 現有核心系統與已暴露的 Lua API
 - **Lua 綁定機制**：子系統建構時發布 `RegisterScriptBindingEvent`（存入 `LUA_REGISTRYINDEX` 並註冊全域 `lua_CFunction`），解構時發布 `UnregisterScriptBindingEvent`；`LuaRef` 已封裝 `lua_State*`，無參數呼叫直接 `ref.push()`。

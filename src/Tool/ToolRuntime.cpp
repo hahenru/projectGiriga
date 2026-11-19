@@ -49,12 +49,9 @@ void ToolRuntime::initSubsystems() {
     m_uiManager = std::make_unique<UIManager>(
         *m_uiShader,
         *m_context->eventBus,
-        *m_context->keyboard,
-        *m_context->console,
-        *m_context->logger,
         *m_context->toolResources,
         static_cast<float>(fbWidth),
-                                              static_cast<float>(fbHeight)
+        static_cast<float>(fbHeight)
     );
 }
 
