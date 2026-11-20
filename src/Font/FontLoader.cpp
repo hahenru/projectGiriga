@@ -8,14 +8,8 @@
 // FontLoader 實作
 // ==========================================
 
-FontLoader::~FontLoader() {
-    if (m_face) FT_Done_Face(m_face);
-    if (m_ft) FT_Done_FreeType(m_ft);
-}
-
-// 1. 建構子初始化列表中記錄 fontSize
 FontLoader::FontLoader(const std::string& fontPath, unsigned int fontSize)
-: m_fontSize(fontSize) {
+    : m_fontSize(fontSize) {
     if (FT_Init_FreeType(&m_ft)) {
         throw std::runtime_error("Failed to initialize FreeType library");
     }
@@ -26,19 +20,21 @@ FontLoader::FontLoader(const std::string& fontPath, unsigned int fontSize)
         throw std::runtime_error("Failed to load font from: " + fontPath);
     }
 
-    // 設定字元像素尺寸
     FT_Set_Pixel_Sizes(m_face, 0, fontSize);
 }
 
-// 2. 移動建構子
+FontLoader::~FontLoader() {
+    if (m_face) FT_Done_Face(m_face);
+    if (m_ft) FT_Done_FreeType(m_ft);
+}
+
 FontLoader::FontLoader(FontLoader&& other) noexcept
-: m_ft(other.m_ft), m_face(other.m_face), m_fontSize(other.m_fontSize) {
+    : m_ft(other.m_ft), m_face(other.m_face), m_fontSize(other.m_fontSize) {
     other.m_ft = nullptr;
     other.m_face = nullptr;
     other.m_fontSize = 0;
 }
 
-// 3. 移動賦值運算子
 FontLoader& FontLoader::operator=(FontLoader&& other) noexcept {
     if (this != &other) {
         if (m_face) {
@@ -69,43 +65,10 @@ TextTexture::TextTexture(const FontLoader& font, const std::u32string& text) {
     bake(font.getFace(), text);
 }
 
-TextTexture::~TextTexture() {
-    release();
-}
-
-TextTexture::TextTexture(TextTexture&& other) noexcept
-: m_textureID(other.m_textureID), m_width(other.m_width), m_height(other.m_height) {
-    other.m_textureID = 0;
-    other.m_width = 0;
-    other.m_height = 0;
-}
-
-TextTexture& TextTexture::operator=(TextTexture&& other) noexcept {
-    if (this != &other) {
-        release();
-        m_textureID = other.m_textureID;
-        m_width = other.m_width;
-        m_height = other.m_height;
-        other.m_textureID = 0;
-        other.m_width = 0;
-        other.m_height = 0;
-    }
-    return *this;
-}
-
-void TextTexture::bind(GLuint slot) const{
-    glActiveTexture(GL_TEXTURE0 + slot);
-    glBindTexture(GL_TEXTURE_2D, m_textureID);
-}
-
-void TextTexture::release() {
-    if (m_textureID != 0) {
-        glDeleteTextures(1, &m_textureID);
-        m_textureID = 0;
-    }
-}
-
 void TextTexture::bake(FT_Face face, const std::u32string& text) {
+    m_bitmap.clear();
+    m_width = 0;
+    m_height = 0;
     if (text.empty()) return;
 
     std::vector<GlyphLayout> glyphs;
@@ -146,8 +109,8 @@ void TextTexture::bake(FT_Face face, const std::u32string& text) {
 
     if (m_width <= 0 || m_height <= 0) return;
 
-    // 第二階段：將所有字元合成進同一張單通道 (GL_RED) 緩衝區
-    std::vector<unsigned char> mergedBuffer(m_width * m_height, 0);
+    // 第二階段：將所有字元合成進同一張單通道緩衝區
+    std::vector<unsigned char> mergedBuffer(static_cast<size_t>(m_width) * m_height, 0);
 
     for (const auto& g : glyphs) {
         if (g.buffer.empty()) continue;
@@ -163,22 +126,13 @@ void TextTexture::bake(FT_Face face, const std::u32string& text) {
                 if (dstX >= 0 && dstX < m_width && dstY >= 0 && dstY < m_height) {
                     unsigned char srcVal = g.buffer[r * g.width + c];
                     int dstIdx = dstY * m_width + dstX;
-                    // 取筆畫最大覆蓋率
                     mergedBuffer[dstIdx] = std::max(mergedBuffer[dstIdx], srcVal);
                 }
             }
         }
     }
 
-    // 第三階段：上傳至 GPU 生成單一紋理
-    glGenTextures(1, &m_textureID);
-    glBindTexture(GL_TEXTURE_2D, m_textureID);
-
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, m_width, m_height, 0, GL_RED, GL_UNSIGNED_BYTE, mergedBuffer.data());
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // 第三階段：保存 CPU 端點陣，交由 UIRenderer 懶上傳至 VulkanTexture
+    m_bitmap = std::move(mergedBuffer);
+    ++m_revision;
 }

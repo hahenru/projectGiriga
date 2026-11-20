@@ -1,129 +1,246 @@
+// src/Renderer/UIRenderer.cpp
 #include <Renderer/UIRenderer.h>
-#include <glad/glad.h>
+#include <Renderer/VulkanContext.h>
+#include <fstream>
+#include <stdexcept>
 #include <algorithm>
+#include <array>
 
-UIRenderer::UIRenderer(Shader& defaultShader, float screenWidth, float screenHeight)
-    : m_shader(defaultShader),
+UIRenderer::UIRenderer(VulkanContext& vkCtx, VkFormat colorFormat, float screenWidth, float screenHeight)
+    : m_vkCtx(vkCtx),
+      m_quadMesh(vkCtx),
       m_screenWidth(screenWidth),
       m_screenHeight(screenHeight) {
-    updateProjection();
+
+    createDescriptorResources();
+    createPipelines(colorFormat);
+
+    // 建立 1x1 白色預設貼圖，供純色 Quad 綁定滿足 Descriptor 驗證
+    const uint32_t whitePixel = 0xFFFFFFFF;
+    m_whiteTexture = VulkanTexture(m_vkCtx, m_descriptorPool, m_descriptorSetLayout, &whitePixel, 1, 1, 4);
 }
 
 UIRenderer::~UIRenderer() {
-    for (auto& [_, entry] : m_textureCache) {
-        if (entry.textureID != 0) {
-            GLuint tex = entry.textureID;
-            glDeleteTextures(1, &tex);
-        }
-    }
+    m_vkCtx.waitIdle();
+	m_textCache.clear();
     m_textureCache.clear();
+    m_whiteTexture = VulkanTexture();
+
+    VkDevice dev = m_vkCtx.getDevice();
+    if (m_consoleBgPipeline != VK_NULL_HANDLE) vkDestroyPipeline(dev, m_consoleBgPipeline, nullptr);
+    if (m_uiPipeline != VK_NULL_HANDLE) vkDestroyPipeline(dev, m_uiPipeline, nullptr);
+    if (m_pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(dev, m_pipelineLayout, nullptr);
+    if (m_descriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(dev, m_descriptorPool, nullptr);
+    if (m_descriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(dev, m_descriptorSetLayout, nullptr);
 }
 
-unsigned int UIRenderer::getOrUploadTexture(const ImageResource& image) {
-    if (!image.isLoaded()) return 0;
+void UIRenderer::createDescriptorResources() {
+    VkDevice dev = m_vkCtx.getDevice();
 
-    auto& entry = m_textureCache[&image];
-    const uint64_t currentRev = image.getRevision();
+    VkDescriptorSetLayoutBinding samplerBinding{};
+    samplerBinding.binding = 0;
+    samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerBinding.descriptorCount = 1;
+    samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    // 首次繪製或背景熱重載後 revision 變更，才在主渲染執行緒上傳 GPU
-    if (entry.textureID == 0 || entry.uploadedRevision != currentRev) {
-        GLint maxTextureSize = 8192;
-        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-        if (image.getWidth() > maxTextureSize || image.getHeight() > maxTextureSize) {
-            return 0;
-        }
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &samplerBinding;
 
-        if (entry.textureID == 0) {
-            GLuint tex = 0;
-            glGenTextures(1, &tex);
-            entry.textureID = tex;
-        }
-
-        glBindTexture(GL_TEXTURE_2D, entry.textureID);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
-                     image.getWidth(), image.getHeight(), 0,
-                     GL_RGBA, GL_UNSIGNED_BYTE, image.getPixels().data());
-        glGenerateMipmap(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        entry.uploadedRevision = currentRev;
+    if (vkCreateDescriptorSetLayout(dev, &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("[UIRenderer] Failed to create VkDescriptorSetLayout");
     }
 
-    return entry.textureID;
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSize.descriptorCount = 2048;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.maxSets = 2048;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+
+    if (vkCreateDescriptorPool(dev, &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("[UIRenderer] Failed to create VkDescriptorPool");
+    }
 }
 
-void UIRenderer::drawImage(float x, float y, float width, float height,
-const ImageResource& image,
-float r, float g, float b, float a) {
-    unsigned int texID = getOrUploadTexture(image);
-    if (texID == 0) return;
+VkShaderModule UIRenderer::loadShaderModule(const std::string& spvPath) {
+    std::ifstream file(spvPath, std::ios::ate | std::ios::binary);
+    if (!file.is_open()) {
+        throw std::runtime_error("[UIRenderer] Failed to open SPIR-V file: " + spvPath);
+    }
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texID);
+    size_t fileSize = static_cast<size_t>(file.tellg());
+    std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(fileSize));
 
-    float model[16] = {
-        width, 0.0f,   0.0f, 0.0f,
-        0.0f,  height, 0.0f, 0.0f,
-        0.0f,  0.0f,   1.0f, 0.0f,
-        x,     y,      0.0f, 1.0f
-    };
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = fileSize;
+    createInfo.pCode = buffer.data();
 
-    m_shader.setMat4(1, model);
-    m_shader.setVec4(2, r, g, b, a);
-    m_shader.setInt(3, 2); // 0=純色, 1=字體單通道Alpha, 2=一般RGBA貼圖（需在UI片元著色器補上分支）
-
-    m_quadMesh.draw();
+    VkShaderModule shaderModule = VK_NULL_HANDLE;
+    if (vkCreateShaderModule(m_vkCtx.getDevice(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+        throw std::runtime_error("[UIRenderer] Failed to create VkShaderModule: " + spvPath);
+    }
+    return shaderModule;
 }
 
-void UIRenderer::drawShaderQuad(Shader& customShader, float x, float y, float width, float height, float elapsedTime) {
-    customShader.use();
-    GLuint prog = customShader.getID();
+void UIRenderer::createPipelines(VkFormat colorFormat) {
+    VkDevice dev = m_vkCtx.getDevice();
 
-    glProgramUniformMatrix4fv(prog, 0, 1, GL_FALSE, m_projection);
-    float model[16] = {
-        width, 0.0f,   0.0f, 0.0f,
-        0.0f,  height, 0.0f, 0.0f,
-        0.0f,  0.0f,   1.0f, 0.0f,
-        x,     y,      0.0f, 1.0f
-    };
-    glProgramUniformMatrix4fv(prog, 1, 1, GL_FALSE, model);
-    glProgramUniform1f(prog, 2, elapsedTime);
-    glProgramUniform2f(prog, 3, width, height);
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(UIPushConstants);
 
-    m_quadMesh.draw();
-    beginCurrent(); // 畫完切回 UIRenderer 預設 UI Shader
+    VkPipelineLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfo.setLayoutCount = 1;
+    layoutInfo.pSetLayouts = &m_descriptorSetLayout;
+    layoutInfo.pushConstantRangeCount = 1;
+    layoutInfo.pPushConstantRanges = &pushRange;
+
+    if (vkCreatePipelineLayout(dev, &layoutInfo, nullptr, &m_pipelineLayout) != VK_SUCCESS) {
+        throw std::runtime_error("[UIRenderer] Failed to create VkPipelineLayout");
+    }
+
+    VkShaderModule uiVert = loadShaderModule("./assets/shaders/ui.vert.spv");
+    VkShaderModule uiFrag = loadShaderModule("./assets/shaders/ui.frag.spv");
+    m_uiPipeline = buildGraphicsPipeline(uiVert, uiFrag, colorFormat);
+    vkDestroyShaderModule(dev, uiFrag, nullptr);
+
+    // Console 背景特效共用同一份 ui.vert.spv
+    VkShaderModule consoleFrag = loadShaderModule("./assets/shaders/console_bg.frag.spv");
+    m_consoleBgPipeline = buildGraphicsPipeline(uiVert, consoleFrag, colorFormat);
+    vkDestroyShaderModule(dev, consoleFrag, nullptr);
+    vkDestroyShaderModule(dev, uiVert, nullptr);
+}
+
+VkPipeline UIRenderer::buildGraphicsPipeline(VkShaderModule vertModule, VkShaderModule fragModule, VkFormat colorFormat) {
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stages[0].module = vertModule;
+    stages[0].pName = "main";
+
+    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    stages[1].module = fragModule;
+    stages[1].pName = "main";
+
+    // 頂點格式：vec2 aPos (offset 0), vec2 aTexCoord (offset 8)，stride = 16 bytes
+    VkVertexInputBindingDescription bindingDesc{};
+    bindingDesc.binding = 0;
+    bindingDesc.stride = 4 * sizeof(float);
+    bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    std::array<VkVertexInputAttributeDescription, 2> attrDescs{};
+    attrDescs[0] = { 0, 0, VK_FORMAT_R32G32_SFLOAT, 0 };
+    attrDescs[1] = { 1, 0, VK_FORMAT_R32G32_SFLOAT, 2 * sizeof(float) };
+
+    VkPipelineVertexInputStateCreateInfo vertexInput{};
+    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInput.vertexBindingDescriptionCount = 1;
+    vertexInput.pVertexBindingDescriptions = &bindingDesc;
+    vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrDescs.size());
+    vertexInput.pVertexAttributeDescriptions = attrDescs.data();
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.lineWidth = 1.0f;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendAttachmentState blendAttachment{};
+    blendAttachment.blendEnable = VK_TRUE;
+    blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &blendAttachment;
+
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    // Vulkan 1.3 Dynamic Rendering Attachment 宣告
+    VkPipelineRenderingCreateInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachmentFormats = &colorFormat;
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &renderingInfo;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = stages;
+    pipelineInfo.pVertexInputState = &vertexInput;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = m_pipelineLayout;
+
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    if (vkCreateGraphicsPipelines(m_vkCtx.getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+        throw std::runtime_error("[UIRenderer] Failed to create Graphics Pipeline");
+    }
+    return pipeline;
 }
 
 void UIRenderer::setScreenSize(float width, float height) {
     m_screenWidth = width;
     m_screenHeight = height;
-    updateProjection();
 }
 
-void UIRenderer::begin() {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DEPTH_TEST);
-    beginCurrent();
-}
+void UIRenderer::begin(VkCommandBuffer cmd) {
+    m_currentCmd = cmd;
+    if (m_currentCmd == VK_NULL_HANDLE) return;
 
-void UIRenderer::beginCurrent() {
-    m_shader.use();
-    m_shader.setMat4(0, m_projection);
+    vkCmdBindPipeline(m_currentCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_uiPipeline);
+
+    VkViewport viewport{ 0.0f, 0.0f, m_screenWidth, m_screenHeight, 0.0f, 1.0f };
+    vkCmdSetViewport(m_currentCmd, 0, 1, &viewport);
+    resetFullScreenScissor();
 }
 
 void UIRenderer::end() {
     while (!m_scissorStack.empty()) {
         popClipRect();
     }
-    glDisable(GL_SCISSOR_TEST);
-    glDisable(GL_BLEND);
+    m_currentCmd = VK_NULL_HANDLE;
 }
 
 void UIRenderer::pushClipRect(float x, float y, float width, float height) {
@@ -151,64 +268,133 @@ void UIRenderer::popClipRect() {
     m_scissorStack.pop_back();
 
     if (m_scissorStack.empty()) {
-        glDisable(GL_SCISSOR_TEST);
+        resetFullScreenScissor();
     } else {
         applyScissor(m_scissorStack.back());
     }
 }
 
+void UIRenderer::applyScissor(const ScissorRect& rect) {
+    if (m_currentCmd == VK_NULL_HANDLE) return;
+    // Vulkan 原點就在左上角，不需像 OpenGL 翻轉 Y 軸
+    int32_t sx = std::max(0, static_cast<int32_t>(rect.x));
+    int32_t sy = std::max(0, static_cast<int32_t>(rect.y));
+    uint32_t sw = static_cast<uint32_t>(std::max(0.0f, rect.width));
+    uint32_t sh = static_cast<uint32_t>(std::max(0.0f, rect.height));
+
+    VkRect2D scissor{ { sx, sy }, { sw, sh } };
+    vkCmdSetScissor(m_currentCmd, 0, 1, &scissor);
+}
+
+void UIRenderer::resetFullScreenScissor() {
+    if (m_currentCmd == VK_NULL_HANDLE) return;
+    VkRect2D full{
+        { 0, 0 },
+        { static_cast<uint32_t>(std::max(1.0f, m_screenWidth)),
+          static_cast<uint32_t>(std::max(1.0f, m_screenHeight)) }
+    };
+    vkCmdSetScissor(m_currentCmd, 0, 1, &full);
+}
+
 void UIRenderer::drawQuad(float x, float y, float width, float height,
                           float r, float g, float b, float a) {
-    glBindTexture(GL_TEXTURE_2D, 0);
+    if (m_currentCmd == VK_NULL_HANDLE) return;
 
-    float model[16] = {
-        width, 0.0f,   0.0f, 0.0f,
-        0.0f,  height, 0.0f, 0.0f,
-        0.0f,  0.0f,   1.0f, 0.0f,
-        x,     y,      0.0f, 1.0f
-    };
+    VkDescriptorSet descSet = m_whiteTexture.getDescriptorSet();
+    vkCmdBindDescriptorSets(m_currentCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &descSet, 0, nullptr);
 
-    m_shader.setMat4(1, model);
-    m_shader.setVec4(2, r, g, b, a);
-    m_shader.setInt(3, 0); // ★ 關鍵：isText = false，走純色渲染分支！
+    UIPushConstants pc{};
+    pc.rect = { x, y, width, height };
+    pc.color = { r, g, b, a };
+    pc.params = { 0.0f, 0.0f, m_screenWidth, m_screenHeight };
 
-    m_quadMesh.draw();
+    vkCmdPushConstants(m_currentCmd, m_pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(UIPushConstants), &pc);
+    m_quadMesh.draw(m_currentCmd);
 }
 
-void UIRenderer::drawTexturedRect(float x, float y, float width, float height,
-       unsigned int textureID, const float color[4]) {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureID);
+void UIRenderer::drawTexture(float x, float y, float width, float height,
+                             const VulkanTexture& texture,
+                             float r, float g, float b, float a, int renderMode) {
+    if (m_currentCmd == VK_NULL_HANDLE || !texture.isValid()) return;
 
-    float model[16] = {
-        width, 0.0f,   0.0f, 0.0f,
-        0.0f,  height, 0.0f, 0.0f,
-        0.0f,  0.0f,   1.0f, 0.0f,
-        x,     y,      0.0f, 1.0f
-    };
+    VkDescriptorSet descSet = texture.getDescriptorSet();
+    vkCmdBindDescriptorSets(m_currentCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &descSet, 0, nullptr);
 
-    m_shader.setMat4(1, model);
-    m_shader.setVec4(2, color[0], color[1], color[2], color[3]);
-    m_shader.setInt(3, 1); // ★ 關鍵：isText = true，Shader 才會取樣字體單通道 Alpha！
+    UIPushConstants pc{};
+    pc.rect = { x, y, width, height };
+    pc.color = { r, g, b, a };
+    pc.params = { static_cast<float>(renderMode), 0.0f, m_screenWidth, m_screenHeight };
 
-    m_quadMesh.draw();
+    vkCmdPushConstants(m_currentCmd, m_pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(UIPushConstants), &pc);
+    m_quadMesh.draw(m_currentCmd);
 }
 
-void UIRenderer::updateProjection() {
-    float rl = 1.0f / m_screenWidth;
-    float tb = -1.0f / m_screenHeight;
+const VulkanTexture* UIRenderer::getOrUploadTexture(const ImageResource& image) {
+    if (!image.isLoaded()) return nullptr;
 
-    m_projection[0] = 2.0f * rl;  m_projection[4] = 0.0f;       m_projection[8]  = 0.0f;  m_projection[12] = -1.0f;
-    m_projection[1] = 0.0f;       m_projection[5] = 2.0f * tb;  m_projection[9]  = 0.0f;  m_projection[13] = 1.0f;
-    m_projection[2] = 0.0f;       m_projection[6] = 0.0f;       m_projection[10] = -1.0f; m_projection[14] = 0.0f;
-    m_projection[3] = 0.0f;       m_projection[7] = 0.0f;       m_projection[11] = 0.0f;  m_projection[15] = 1.0f;
+    auto& entry = m_textureCache[&image];
+    const uint64_t currentRev = image.getRevision();
+
+    if (!entry.texture.isValid() || entry.uploadedRevision != currentRev) {
+        entry.texture = VulkanTexture(
+            m_vkCtx, m_descriptorPool, m_descriptorSetLayout,
+            image.getPixels().data(), image.getWidth(), image.getHeight(), 4
+        );
+        entry.uploadedRevision = currentRev;
+    }
+
+    return &entry.texture;
 }
 
-void UIRenderer::applyScissor(const ScissorRect& rect) {
-    glEnable(GL_SCISSOR_TEST);
-    GLint glX = static_cast<GLint>(rect.x);
-    GLint glY = static_cast<GLint>(m_screenHeight - (rect.y + rect.height));
-    GLsizei glW = static_cast<GLsizei>(std::max(0.0f, rect.width));
-    GLsizei glH = static_cast<GLsizei>(std::max(0.0f, rect.height));
-    glScissor(glX, glY, glW, glH);
+void UIRenderer::drawImage(float x, float y, float width, float height,
+                           const ImageResource& image,
+                           float r, float g, float b, float a) {
+    const VulkanTexture* tex = getOrUploadTexture(image);
+    if (!tex) return;
+    drawTexture(x, y, width, height, *tex, r, g, b, a, 2);
+}
+
+void UIRenderer::drawConsoleBgQuad(float x, float y, float width, float height, float elapsedTime) {
+    if (m_currentCmd == VK_NULL_HANDLE) return;
+
+    vkCmdBindPipeline(m_currentCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_consoleBgPipeline);
+
+    VkDescriptorSet descSet = m_whiteTexture.getDescriptorSet();
+    vkCmdBindDescriptorSets(m_currentCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &descSet, 0, nullptr);
+
+    UIPushConstants pc{};
+    pc.rect = { x, y, width, height };
+    pc.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    pc.params = { 0.0f, elapsedTime, m_screenWidth, m_screenHeight };
+
+    vkCmdPushConstants(m_currentCmd, m_pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0, sizeof(UIPushConstants), &pc);
+    m_quadMesh.draw(m_currentCmd);
+
+    // 繪製完畢後切回標準 UI 管線
+    vkCmdBindPipeline(m_currentCmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_uiPipeline);
+}
+
+void UIRenderer::drawText(float x, float y, float width, float height,
+                          const TextTexture& textTex, const float color[4]) {
+    if (!textTex.isValid() || !color) return;
+
+    auto& entry = m_textCache[&textTex];
+    const uint64_t currentRev = textTex.getRevision();
+
+    if (!entry.texture.isValid() || entry.uploadedRevision != currentRev) {
+        entry.texture = VulkanTexture(
+            m_vkCtx, m_descriptorPool, m_descriptorSetLayout,
+            textTex.getBitmap().data(), textTex.getWidth(), textTex.getHeight(), 1
+        );
+        entry.uploadedRevision = currentRev;
+    }
+
+    // renderMode = 1 走 ui.frag 的單通道 R8 Alpha 混合分支
+    drawTexture(x, y, width, height, entry.texture, color[0], color[1], color[2], color[3], 1);
 }

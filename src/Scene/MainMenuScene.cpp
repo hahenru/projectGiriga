@@ -4,10 +4,9 @@
 #include <UI/UIButton.h>
 #include <UI/UIText.h>
 #include <UI/UISlantedLayout.h>
-#include <Audio/AudioSystem.h>
 #include <Core/CoreContext.h>
 #include <Resource/IResourceManager.h>
-#include <Client/ClientContext.h>
+#include <Event/Event.h>
 #include <iostream>
 
 std::unique_ptr<UIContainer> MainMenuScene::createUI() {
@@ -52,9 +51,9 @@ std::unique_ptr<UIContainer> MainMenuScene::createUI() {
 }
 
 void MainMenuScene::onEnter() {
-	if (auto* clientCtx = dynamic_cast<ClientContext*>(&m_ctx)) {
-		clientCtx->audio->playBGM("./assets/Sounds/Deserted-Hell.wav", true);
-	}
+    if (m_ctx.eventBus) {
+        m_ctx.eventBus->publish(PlayBGMEvent{"./assets/Sounds/Deserted-Hell.wav", true});
+    }
     std::cout << "[Scene] Entering MainMenuScene...\n";
 }
 

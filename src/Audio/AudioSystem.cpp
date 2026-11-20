@@ -54,11 +54,23 @@ AudioSystem::AudioSystem(EventBus& eventBus)
     if (result != MA_SUCCESS) {
         std::cerr << "[AudioSystem] 初始化音訊引擎失敗！\n";
     }
+	m_eventBus.subscribe<PlayBGMEvent>([this](PlayBGMEvent& e) {
+		playBGM(e.filePath, e.loop);
+	}, getID());
+
+	m_eventBus.subscribe<StopBGMEvent>([this](StopBGMEvent&) {
+		stopBGM();
+	}, getID());
+
+	m_eventBus.subscribe<PlaySFXEvent>([this](PlaySFXEvent& e) {
+		playSFX(e.filePath);
+	}, getID());
 
     registerScriptBindings();
 }
 
 AudioSystem::~AudioSystem() {
+	m_eventBus.unsubscribeByOwner(getID());
     unregisterScriptBindings();
     stopBGM();
     // 釋放引擎資源

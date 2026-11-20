@@ -1,11 +1,11 @@
 #include <Girigara.h>
 #include <Resource/ScriptResource.h>
 #include <Server/ServerConfig.h>
+#include <Scene/EngineScene.h>
 #include <chrono>
 #include <filesystem>
 
 #ifndef GIRIGARA_SERVER
-#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #endif
 
@@ -77,18 +77,19 @@ void Girigara::initHeadlessSubsystems() {
 
 #ifndef GIRIGARA_SERVER
 void Girigara::initGraphicalSubsystems() {
-    // 1. 初始化 GLFW 與主視窗（預留 m_windows 支援未來多視窗）
+    // 1. 初始化 GLFW、全局 Vulkan 裝置與主視窗（預留 m_windows 支援未來多視窗）
     m_glfw = std::make_unique<GlfwContext>();
+    m_vkCtx = std::make_unique<VulkanContext>(*m_context->logger, true);
+
     auto mainWin = std::make_unique<WindowManager>(
         m_config.width, m_config.height, m_config.title,
-        *m_context->eventBus, *m_context->logger
+        *m_vkCtx, *m_context->eventBus, *m_context->logger
     );
-    GlfwContext::initGLAD();
 
     int fbWidth = m_config.width;
     int fbHeight = m_config.height;
     glfwGetFramebufferSize(mainWin->getWindow(), &fbWidth, &fbHeight);
-    glViewport(0, 0, fbWidth, fbHeight);
+    m_windows.push_back(std::move(mainWin));
 
     // 2. 初始化輸入、音訊、網路與資源管理器
     m_keyboard = std::make_unique<KeyboardSystem>(*m_context->eventBus);
@@ -103,13 +104,8 @@ void Girigara::initGraphicalSubsystems() {
     m_clientResources = std::make_unique<ClientResourceManager>(*m_context->logger);
     m_context->resources = m_clientResources.get();
 
-    // 3. 載入預設字型與 UI Shader
+    // 3. 載入預設字型（註：Shader 將於下一步改為載入 SPIR-V 與 VulkanPipeline）
     m_clientResources->loadFont("default", "./assets/font/NaikaiFont-Regular.ttf", 48);
-    m_uiShader = &m_clientResources->loadShader("ui", "./assets/shaders/ui.vert", "./assets/shaders/ui.frag");
-
-    mainWin->setShader(m_uiShader);
-    mainWin->updateProjection(fbWidth, fbHeight);
-    m_windows.push_back(std::move(mainWin));
 
     // 4. 載入系統腳本並建立場景管理器
     loadSystemScripts("./assets/sysScripts");
@@ -120,7 +116,8 @@ void Girigara::initGraphicalSubsystems() {
     const float h = static_cast<float>(fbHeight);
 
     m_uiManager = std::make_unique<UIManager>(
-        *m_uiShader,
+        *m_vkCtx,
+        m_windows.front()->getSwapchainImageFormat(),
         *m_context->eventBus,
         *m_clientResources,
         w, h
@@ -130,7 +127,9 @@ void Girigara::initGraphicalSubsystems() {
         initDevTools(w, h);
     }
 }
+#endif
 
+#ifndef GIRIGARA_SERVER
 void Girigara::initDevTools(float width, float height) {
     // 掛載系統/開發者設定視窗
     m_devSettingsMenu = m_uiManager->emplaceOverlay<UISettingsMenu>(
@@ -318,18 +317,27 @@ void Girigara::runGraphicalLoop() {
         m_sceneManager->update(dt);
         m_uiManager->update(dt);
 
-        // 4. 畫面渲染
-        glClearColor(0.12f, 0.12f, 0.14f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // 4. 畫面渲染（多視窗 Vulkan 雙階段 Dynamic Rendering 管線）
+		for (size_t i = 0; i < m_windows.size(); ++i) {
+			auto& win = m_windows[i];
+			uint32_t imageIndex = 0;
+			VkCommandBuffer cmd = win->beginCommandBuffer(imageIndex);
+			if (cmd == VK_NULL_HANDLE) continue;
 
-        if (auto* scene = m_sceneManager->getCurrentScene()) {
-            scene->renderWorld();
-        }
-        m_uiManager->render();
+			// Pass 1（主視窗專屬）：若當前為 EngineScene，先將所有內嵌 UIViewport 離屏渲染完畢
+			if (i == 0) {
+				if (auto* engineScene = dynamic_cast<EngineScene*>(m_sceneManager->getCurrentScene())) {
+					engineScene->renderViewportsOffscreen(cmd);
+				}
+			}
 
-        for (auto& win : m_windows) {
-            win->swapBuffers();
-        }
-    }
+			// Pass 2：開啟主視窗 Swapchain Dynamic Rendering，繪製場景 UI、UIWindow 視口與開發者 Console
+			win->beginSwapchainRendering(cmd, imageIndex);
+			if (i == 0 && m_uiManager) {
+				m_uiManager->render(cmd);
+			}
+			win->endFrame(imageIndex);
+		}
+	}
 }
 #endif

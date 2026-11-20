@@ -1,9 +1,10 @@
 #include <Renderer/QuadMesh.h>
-#include <utility>
+#include <Renderer/VulkanContext.h>
+#include <cstring>
+#include <stdexcept>
 
-QuadMesh::QuadMesh() {
-    // 單位 Quad：2 個直角三角形，範圍覆蓋 (0,0) 到 (1,1)
-    // 格式：x, y, u, v
+QuadMesh::QuadMesh(VulkanContext& vkCtx) : m_vkCtx(&vkCtx) {
+    // 單位 Quad：2 個直角三角形 (x, y, u, v)，左上 (0,0) 至右下 (1,1)
     const float vertices[] = {
         0.0f, 0.0f,   0.0f, 0.0f,
         1.0f, 0.0f,   1.0f, 0.0f,
@@ -14,23 +15,50 @@ QuadMesh::QuadMesh() {
         0.0f, 1.0f,   0.0f, 1.0f
     };
 
-    glGenVertexArrays(1, &m_vao);
-    glGenBuffers(1, &m_vbo);
+    const VkDeviceSize bufferSize = sizeof(vertices);
 
-    glBindVertexArray(m_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // 1. 建立 CPU 可寫入 Staging Buffer
+    VkBufferCreateInfo stagingInfo{};
+    stagingInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    stagingInfo.size = bufferSize;
+    stagingInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-    // Attribute 0: 位置座標 vec2
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(0));
-    glEnableVertexAttribArray(0);
+    VmaAllocationCreateInfo stagingAllocInfo{};
+    stagingAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-    // Attribute 1: 紋理貼圖座標 vec2
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<void*>(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    VkBuffer stagingBuf = VK_NULL_HANDLE;
+    VmaAllocation stagingAlloc = VK_NULL_HANDLE;
+    if (vmaCreateBuffer(m_vkCtx->getAllocator(), &stagingInfo, &stagingAllocInfo,
+                        &stagingBuf, &stagingAlloc, nullptr) != VK_SUCCESS) {
+        throw std::runtime_error("[QuadMesh] Failed to create staging buffer");
+    }
 
-    // 解除綁定，保持管線狀態乾淨
-    glBindVertexArray(0);
+    void* mapped = nullptr;
+    vmaMapMemory(m_vkCtx->getAllocator(), stagingAlloc, &mapped);
+    std::memcpy(mapped, vertices, static_cast<size_t>(bufferSize));
+    vmaUnmapMemory(m_vkCtx->getAllocator(), stagingAlloc);
+
+    // 2. 建立 GPU 端 Vertex Buffer
+    VkBufferCreateInfo vbInfo{};
+    vbInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    vbInfo.size = bufferSize;
+    vbInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+    VmaAllocationCreateInfo vbAllocInfo{};
+    vbAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    if (vmaCreateBuffer(m_vkCtx->getAllocator(), &vbInfo, &vbAllocInfo,
+                        &m_vertexBuffer, &m_allocation, nullptr) != VK_SUCCESS) {
+        vmaDestroyBuffer(m_vkCtx->getAllocator(), stagingBuf, stagingAlloc);
+        throw std::runtime_error("[QuadMesh] Failed to create GPU vertex buffer");
+    }
+
+    m_vkCtx->immediateSubmit([&](VkCommandBuffer cmd) {
+        VkBufferCopy copyRegion{ 0, 0, bufferSize };
+        vkCmdCopyBuffer(cmd, stagingBuf, m_vertexBuffer, 1, &copyRegion);
+    });
+
+    vmaDestroyBuffer(m_vkCtx->getAllocator(), stagingBuf, stagingAlloc);
 }
 
 QuadMesh::~QuadMesh() {
@@ -38,34 +66,37 @@ QuadMesh::~QuadMesh() {
 }
 
 QuadMesh::QuadMesh(QuadMesh&& other) noexcept
-: m_vao(other.m_vao), m_vbo(other.m_vbo) {
-    other.m_vao = 0;
-    other.m_vbo = 0;
+    : m_vkCtx(other.m_vkCtx), m_vertexBuffer(other.m_vertexBuffer), m_allocation(other.m_allocation) {
+    other.m_vkCtx = nullptr;
+    other.m_vertexBuffer = VK_NULL_HANDLE;
+    other.m_allocation = VK_NULL_HANDLE;
 }
 
 QuadMesh& QuadMesh::operator=(QuadMesh&& other) noexcept {
     if (this != &other) {
         release();
-        m_vao = other.m_vao;
-        m_vbo = other.m_vbo;
-        other.m_vao = 0;
-        other.m_vbo = 0;
+        m_vkCtx = other.m_vkCtx;
+        m_vertexBuffer = other.m_vertexBuffer;
+        m_allocation = other.m_allocation;
+        other.m_vkCtx = nullptr;
+        other.m_vertexBuffer = VK_NULL_HANDLE;
+        other.m_allocation = VK_NULL_HANDLE;
     }
     return *this;
 }
 
 void QuadMesh::release() {
-    if (m_vbo != 0) {
-        glDeleteBuffers(1, &m_vbo);
-        m_vbo = 0;
+    if (m_vkCtx && m_vertexBuffer != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(m_vkCtx->getAllocator(), m_vertexBuffer, m_allocation);
+        m_vertexBuffer = VK_NULL_HANDLE;
+        m_allocation = VK_NULL_HANDLE;
     }
-    if (m_vao != 0) {
-        glDeleteVertexArrays(1, &m_vao);
-        m_vao = 0;
-    }
+    m_vkCtx = nullptr;
 }
 
-void QuadMesh::draw() const {
-    glBindVertexArray(m_vao);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+void QuadMesh::draw(VkCommandBuffer cmd) const {
+    if (cmd == VK_NULL_HANDLE || m_vertexBuffer == VK_NULL_HANDLE) return;
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer, &offset);
+    vkCmdDraw(cmd, 6, 1, 0, 0);
 }

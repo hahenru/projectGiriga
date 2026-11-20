@@ -100,13 +100,9 @@ void UIText::rebake() {
 void UIText::render(UIRenderer& renderer) {
     if (!m_visible || !m_texture || m_width <= 0.0f || m_height <= 0.0f) return;
 
-    renderer.drawTexturedRect(
-        getGlobalX(), getGlobalY(),
-        getLocalWidth(), getLocalHeight(),
-        m_texture->getID(),
-        m_color
-    );
+    renderer.drawText(getGlobalX(), getGlobalY(), m_width, m_height, *m_texture, m_color);
 }
+
 void UIText::setAutoShrink(bool enabled) {
     if (m_autoShrink != enabled) {
         m_autoShrink = enabled;

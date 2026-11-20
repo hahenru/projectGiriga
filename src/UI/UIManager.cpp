@@ -289,11 +289,11 @@ namespace {
     }
 }
 
-UIManager::UIManager(Shader& uiShader,
+UIManager::UIManager(VulkanContext& vkCtx, VkFormat colorFormat,
                      EventBus& eventBus,
                      IResourceManager& resources,
                      float screenWidth, float screenHeight)
-    : m_renderer(uiShader, screenWidth, screenHeight),
+    : m_renderer(vkCtx, colorFormat, screenWidth, screenHeight),
       m_eventBus(eventBus),
       m_resources(resources),
       m_screenWidth(screenWidth),
@@ -424,25 +424,12 @@ void UIManager::update(float dt) {
     }
 }
 
-void UIManager::render() {
-    m_renderer.begin();
-
-    // 1. 即將消亡的場景 UI
-    for (auto& entry : m_dyingSceneUI) {
-        entry.tree->render(m_renderer);
-    }
-
-    // 2. 當前活躍場景 UI（Lua / 遊戲畫面 UI 永遠被限制在這一層）
-    if (m_activeSceneUI && m_activeSceneUI->isVisible()) {
-        m_activeSceneUI->render(m_renderer);
-    }
-
-    // 3. 全域覆蓋層（Console、設定選單、開發者視窗永遠蓋在場景 UI 之上）
+void UIManager::render(VkCommandBuffer cmd) {
+    m_renderer.begin(cmd);
+    for (auto& entry : m_dyingSceneUI) entry.tree->render(m_renderer);
+    if (m_activeSceneUI && m_activeSceneUI->isVisible()) m_activeSceneUI->render(m_renderer);
     m_overlayUI.render(m_renderer);
-
-    // 4. 最頂層彈出層（右鍵選單等）
     m_popupUI.render(m_renderer);
-
     m_renderer.end();
 }
 

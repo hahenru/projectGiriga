@@ -3,7 +3,6 @@
 
 #include <Core/Depersonalization.h>
 #include <Core/Identifiable.h>
-#include <Shader/Shader.h>
 #include <Script/LuaRef.h>
 #include <UI/UIRegistry.h>
 #include <string>

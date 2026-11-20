@@ -10,7 +10,6 @@
 #include <Event/EventBus.h>
 #include <Renderer/UIRenderer.h>
 #include <Resource/IResourceManager.h>
-#include <Shader/Shader.h>
 #include <vector>
 #include <cstddef>
 #include <limits>
@@ -22,17 +21,8 @@ public:
     static constexpr const char* kDefaultFragPath   = "./assets/shaders/console_bg.frag";
 	
     UIConsole(float x, float y, float width, float height,
-              EventBus& eventBus,
-              ConsoleSystem& consoleSystem, LoggerSystem& logger,
-              IResourceManager& resourceManager,
-              Shader& bgShader);
-
-    UIConsole(float x, float y, float width, float height,
-              EventBus& eventBus,
-              ConsoleSystem& consoleSystem, LoggerSystem& logger,
-              IResourceManager& resourceManager,
-              const std::string& vertPath = kDefaultVertPath,
-              const std::string& fragPath = kDefaultFragPath);
+              EventBus& eventBus, ConsoleSystem& console,
+              LoggerSystem& logger, IResourceManager& resourceManager);
 
     ~UIConsole() override;
 
@@ -57,7 +47,6 @@ private:
     ConsoleSystem& m_consoleSystem;
     LoggerSystem& m_logger;
     IResourceManager& m_resources;
-    Shader& m_bgShader;
 
     UIScrollView* m_scrollView{nullptr};
     UIInputField* m_inputField{nullptr};

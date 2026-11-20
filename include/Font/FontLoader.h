@@ -1,20 +1,18 @@
-#ifndef TEXT_TEXTURE_H
-#define TEXT_TEXTURE_H
+#ifndef GIRIGARA_FONT_FONT_LOADER_H
+#define GIRIGARA_FONT_FONT_LOADER_H
 
-#include <glad/glad.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
-// 獨立的字體載入管理類別
 class FontLoader {
 public:
     FontLoader(const std::string& fontPath, unsigned int fontSize);
     ~FontLoader();
 
-    // 禁止拷貝，支援移動
     FontLoader(const FontLoader&) = delete;
     FontLoader& operator=(const FontLoader&) = delete;
     FontLoader(FontLoader&& other) noexcept;
@@ -29,36 +27,24 @@ private:
     unsigned int m_fontSize = 0;
 };
 
-// 符合 RAII 的動態文字紋理對象
 class TextTexture {
 public:
-    // 構造時烘焙文字並生成單一張 OpenGL 紋理
     TextTexture(const FontLoader& font, const std::u32string& text);
+    ~TextTexture() = default;
 
-    // RAII 解構釋放顯存
-    ~TextTexture();
-
-    // 禁止拷貝以防重複釋放
     TextTexture(const TextTexture&) = delete;
     TextTexture& operator=(const TextTexture&) = delete;
 
-    // 移動構造與移動賦值
-    TextTexture(TextTexture&& other) noexcept;
-    TextTexture& operator=(TextTexture&& other) noexcept;
+    TextTexture(TextTexture&& other) noexcept = default;
+    TextTexture& operator=(TextTexture&& other) noexcept = default;
 
-    void bind(GLuint slot = 0) const;
-
-    GLuint getID() const { return m_textureID; }
+    const std::vector<unsigned char>& getBitmap() const { return m_bitmap; }
     int getWidth() const { return m_width; }
     int getHeight() const { return m_height; }
+    uint64_t getRevision() const { return m_revision; }
+    bool isValid() const { return !m_bitmap.empty() && m_width > 0 && m_height > 0; }
 
 private:
-    GLuint m_textureID = 0;
-    int m_width = 0;
-    int m_height = 0;
-
-    void release();
-
     struct GlyphLayout {
         std::vector<unsigned char> buffer;
         int width;
@@ -69,6 +55,11 @@ private:
     };
 
     void bake(FT_Face face, const std::u32string& text);
+
+    std::vector<unsigned char> m_bitmap;
+    int m_width = 0;
+    int m_height = 0;
+    uint64_t m_revision = 0;
 };
 
-#endif // TEXT_TEXTURE_H
+#endif // GIRIGARA_FONT_FONT_LOADER_H

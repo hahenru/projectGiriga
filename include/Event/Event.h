@@ -198,4 +198,18 @@ public:
         : taskId(taskId), success(success), outPath(std::move(outPath)), message(std::move(message)) {}
 };
 
+struct PlayBGMEvent : public Event {
+    std::string filePath;
+    bool loop = true;
+    explicit PlayBGMEvent(std::string path, bool isLoop = true)
+        : filePath(std::move(path)), loop(isLoop) {}
+};
+
+struct StopBGMEvent : public Event {};
+
+struct PlaySFXEvent : public Event {
+    std::string filePath;
+    explicit PlaySFXEvent(std::string path)
+        : filePath(std::move(path)) {}
+};
 #endif // GIRIGARA_EVENT_EVENT_H

@@ -3,16 +3,12 @@
 #include <algorithm>
 
 UIConsole::UIConsole(float x, float y, float width, float height,
-         EventBus& eventBus,
-         ConsoleSystem& consoleSystem, LoggerSystem& logger,
-         IResourceManager& resourceManager,
-         Shader& bgShader)
-	: UIContainer(x, y, width, height),
-	m_eventBus(eventBus),
-	m_consoleSystem(consoleSystem),
-	m_logger(logger),
-	m_resources(resourceManager),
-	m_bgShader(bgShader) {
+                     EventBus& eventBus, ConsoleSystem& console,
+                     LoggerSystem& logger, IResourceManager& resourceManager) : UIContainer(x, y, width, height),
+                        m_eventBus(eventBus),
+                        m_consoleSystem(console),
+                        m_logger(logger),
+                        m_resources(resourceManager){
 
     setVisible(false);
     setPassThrough(false);
@@ -37,15 +33,6 @@ UIConsole::UIConsole(float x, float y, float width, float height,
     layoutChildren(width, height);
     bindEvents();
 }
-
-UIConsole::UIConsole(float x, float y, float width, float height,
-                     EventBus& eventBus,
-                     ConsoleSystem& consoleSystem, LoggerSystem& logger,
-                     IResourceManager& resourceManager,
-                     const std::string& vertPath,
-                     const std::string& fragPath)
-    : UIConsole(x, y, width, height, eventBus, consoleSystem, logger, resourceManager,
-                resourceManager.getOrLoadShader(kDefaultShaderName, vertPath, fragPath)) {}
 
 UIConsole::~UIConsole() {
     m_eventBus.unsubscribeByOwner(getID());
@@ -177,7 +164,7 @@ void UIConsole::update(float dt) {
 void UIConsole::render(UIRenderer& renderer) {
     if (!isVisible()) return;
 
-    renderer.drawShaderQuad(m_bgShader, getGlobalX(), getGlobalY(), m_width, m_height, m_elapsedTime);
+    renderer.drawConsoleBgQuad(getGlobalX(), getGlobalY(), m_width, m_height, m_elapsedTime);
     UIContainer::render(renderer);
 }
 

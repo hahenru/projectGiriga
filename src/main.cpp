@@ -1,11 +1,7 @@
 #include <Girigara.h>
 #include <Server/ServerConfig.h>
-
-#if defined(GIRIGARA_SERVER)
-#include <Scene/LuaScene.h>
-#else
 #include <Scene/MainMenuScene.h>
-#endif
+
 
 int main() {
 #if defined(GIRIGARA_SERVER)

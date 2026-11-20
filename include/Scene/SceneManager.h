@@ -84,9 +84,6 @@ public:
     Scene* findSceneByTag(const std::string& tag) const;
     std::vector<SceneID> getMountedSceneIDs() const;
 
-    // 供 Lua 腳本呼叫的便利介面
-    void switchToLuaScene(const std::string& scriptResourceName);
-
     // ★ 向下相容單一主場景切換（自動清空舊場景並設為 primaryScene）
     template<typename T, typename... Args>
     void switchScene(Args&&... args) {
@@ -125,9 +122,6 @@ private:
     void stepSlot(SceneSlot& slot, float rawDt);
     void startDedicatedLoop(SceneSlot& slot);
     void stopAndClearAllImmediate();
-
-    void registerScriptBindings();
-    void unregisterScriptBindings();
 
     CoreContext& m_ctx;
 

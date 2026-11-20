@@ -33,28 +33,6 @@ bool ClientResourceManager::reload(const std::type_index type, const std::string
     return res ? res->reload() : false;
 }
 
-// --- Shader 載入實作 ---
-Shader& ClientResourceManager::loadShader(const std::string& name, const std::string& vertPath, const std::string& fragPath) {
-    auto& map = m_registry[std::type_index(typeid(Shader))];
-    auto it = map.find(name);
-    if (it != map.end()) {
-        return *static_cast<Shader*>(it->second.get());
-    }
-    auto shader = std::make_unique<Shader>(vertPath, fragPath);
-    auto* raw = shader.get();
-    map.emplace(name, std::move(shader));
-    return *raw;
-}
-
-Shader& ClientResourceManager::getShader(const std::string& name) {
-    return get<Shader>(name);
-}
-
-Shader& ClientResourceManager::getOrLoadShader(const std::string& name,
-                            const std::string& vertPath,
-                            const std::string& fragPath) {
-        return loadShader(name, vertPath, fragPath);
-    }
 // --- Font 載入實作 ---
 void ClientResourceManager::registerFontPath(const std::string& name, const std::vector<std::string>& candidates, unsigned int defaultSize) {
     m_fontConfigs[name] = FontConfig{ candidates, defaultSize };

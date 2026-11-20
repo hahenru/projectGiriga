@@ -9,24 +9,25 @@
 我將按常理為您提供一個視窗和一些場景，但目前仍然沒有場景編輯器供您使用。
 
 此外，我們使用的腳本語言並非常見的 C# 或是 JavaScript。是的，我很抱歉，這兩個語言對我來說太複雜了。
+
 *（笑點解析：你使用的可是全世界最複雜的語言 C++ 來作為引擎的基礎語言，外加 Lua 來寫腳本。）*
+
+我本可以選擇Ruby和Python這兩種漂亮的語言的，可惜我學不來。
 
 ---
 
 ## 核心特性
 
-- **現代 C++ 打造**：採用 C++20/C++23/C++26 標準、GLFW、GLAD 與 OpenGL 4.6 Core Profile。
+- **現代 C++ 打造**：採用 C++23/C++26 標準、GLFW 與 Vulkan。
 - **純粹的自製 UI 系統**：
   - 支援相對父節點的局部座標階層（Parent-Child 座標樹）。
   - 支援百分比定位（支援精確至 0.01% 的浮動配置）與像素模式無縫切換。
   - 具備文字超界自適應縮放、動態字型貼圖烘焙（FreeType）。
   - 視窗拖曳具備邊界限制約束，畫面放大縮小自動校正防跑版。
-- **內建除錯 Console 與 Shader 背景**：
-  - In-Game Console 即時 REPL，直接調用 Lua 虛擬機全域環境與 C++ 註冊指令。
-  - 後端 Shader 動態線性漸層與半透明高光泡泡效果。
+  - 內建除錯 Console
 - **熱插拔腳本架構**：
   - 啟動時自動掃描並常駐 `./assets/sysScripts/` 下的所有 Lua 系統腳本。
-  - 原生 C++ 場景（`Scene`）與動態腳本場景（`LuaScene`）雙軌切換架構。
+  - 原生 C++ 場景（`Scene`）架構。
 - **音訊系統**
   - 現在可以載入音訊了，遊戲可能還做不太到，但是做出一個撥放器已經綽綽有餘了
   - 原生支援多軌音訊介面(在linux下)
@@ -39,20 +40,16 @@
 
 ## 未來展望（畫餅階段）
 
-未來我有機會引用最有名的 **ImGui** 作為引擎編輯器的部分。
-
-不過到了那個時候，我得把 Engine 和 Runtime 徹底分開，這恐怕會很麻煩……所以就如上述，是**「有機會」**而非保證。
-
 以下是近期目標：
 - 一個正常的場景轉場
-- 加入 SQLite 的支援還有某種 ZIP 的解決方案，和一些額外的添加物，為了增添風味。
-- 圖片載入的功能，但不是 libpng、libjpg，它不夠全能。
-- glm 或是其他數學庫
+- 一個可用的右鍵選單
+- 把軟體修到接近沒有肉眼可見的BUG
 
 以下是遠期目標：
 - HTTPS 和 WebSocket 支持。
 - 使用 ENet + Asio + libcurl 的組合。
-- Engine, Runtime 徹底分離。
+- 將引擎的功能做出來
+- 反射！
 
 ---
 
@@ -107,16 +104,22 @@ make help
 | 組件名稱 | 建議版本 | 說明 | 鏈結參數 |
 | :--- | :--- | :--- | :--- |
 | **GCC / G++** | 13+ (支援 C++23) | 核心編譯工具鏈 | `-std=c++23` |
-| **OpenGL** | 4.6 Core Profile | 核心圖形渲染 API | `-lGL` / `-lopengl32` |
-| **GLFW** | 3.5.1 | 視窗建立、輸入事件監聽與 Context 管理 | `-lglfw` / `-lglfw3` |
-| **FreeType 2** | 2.15.0 | 向量字型載入與動態點陣圖烘焙 | `pkg-config --libs freetype2` / `-lfreetype` |
+| **Vulkan SDK / Loader** | 1.3+ | 核心圖形 API 標頭與載入器（Linux 需 `vulkan-headers` + `vulkan-loader-devel`） | `-lvulkan` / `-lvulkan-1` |
+| **vk-bootstrap** | 最新版 | Vulkan Instance / Device / Swapchain 初期化輔助庫（預編譯靜態庫） | `-lvk-bootstrap` |
+| **VMA (Vulkan Memory Allocator)** | 3.1+ | 顯存緩衝區與貼圖配置管理（純標頭檔 `vk_mem_alloc.h`） | Header-only |
+| **GLM** | 1.0+ | 向量與矩陣數學庫（啟用 `GLM_FORCE_RADIANS` 與 `GLM_FORCE_DEPTH_ZERO_TO_ONE`） | Header-only |
+| **glslc** | 隨 Vulkan SDK / shaderc | 將 GLSL 450 著色器編譯為 `.spv` 二進位檔（建置期 CLI 工具） | 建置期執行 |
+| **GLFW** | 3.4+ | 視窗建立、輸入事件監聽與 `VkSurfaceKHR` 橋接 | `-lglfw` / `-lglfw3` |
+| **FreeType 2** | 2.13+ | 向量字型載入與動態點陣圖烘焙 | `pkg-config --libs freetype2` / `-lfreetype` |
 | **Lua** | 5.5.1 | 腳本引擎與 In-Game REPL 執行環境 | `-llua` |
 | **ENet** | After 1.3.18 Commit 5a9c537 | 低延遲遊戲網路庫 | `-lenet` (Win: `-lenet -lws2_32`) |
+| **miniz** | 3.0+ | `.gpk` 資源封包壓縮與解壓縮庫 | `pkg-config --libs miniz` / `-lminiz` |
 | **ALSA** *(Linux 專用)* | 最新版 | 底層音訊後端支援 | `-lasound` |
-| **miniaudio** | 0.11.26 | 單一標頭檔音訊引擎（已內建實作包裝於專案中） | 需放置於 include 路徑 |
-| **GLAD** | 4.6 Core | OpenGL Function Loader | 原始碼已內建於 `src/glad.c` |
+| **miniaudio** | 0.11.26 | 單一標頭檔音訊引擎（僅由專案中 `miniaudio_impl.cpp` 包裝實作） | 需放置於 include 路徑 |
 
-以上依賴，除了glad以外，全部建議預編譯好，放在系統資料夾等待連結。
+以上依賴全部不放入專案倉庫，建議預編譯好並放置於系統預設搜尋路徑（如 `/usr/include`、`/usr/local`）或環境變數 `CPATH` 與 `LIBRARY_PATH` 指定的外部資料夾中等待連結。
+
+大家應該做個愛乾淨的開發者，不要把依賴放進"磚案"，不然真的會變得又大又硬
 
 
 ## 一點額外的教學

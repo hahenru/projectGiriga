@@ -1,7 +1,6 @@
 #ifndef GIRIGARA_CLIENT_CLIENT_CLIENTRESOURCEMANAGER_H
 #define GIRIGARA_CLIENT_CLIENT_CLIENTRESOURCEMANAGER_H
 #include <Resource/IResourceManager.h>
-#include <Shader/Shader.h>
 #include <Resource/FontResource.h>
 #include <Resource/AudioResource.h>
 #include <Resource/ScriptResource.h>
@@ -16,11 +15,6 @@ class ClientResourceManager : public IResourceManager {
 public:
     explicit ClientResourceManager(LoggerSystem& logger);
     ~ClientResourceManager() override = default;
-
-    // --- Shader ---
-    Shader& loadShader(const std::string& name, const std::string& vertPath, const std::string& fragPath);
-    Shader& getShader(const std::string& name);
-	Shader& getOrLoadShader(const std::string& name, const std::string& vertPath, const std::string& fragPath) override;
 
     // --- Font ---
     void registerFontPath(const std::string& name, const std::vector<std::string>& candidates, unsigned int defaultSize = 48);

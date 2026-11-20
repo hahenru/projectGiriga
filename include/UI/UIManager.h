@@ -21,7 +21,7 @@ struct DyingUIEntry {
 
 class UIManager : public Identifiable {
 public:
-    UIManager(Shader& uiShader,
+    UIManager(VulkanContext& vkCtx, VkFormat colorFormat,
               EventBus& eventBus,
               IResourceManager& resources,
               float screenWidth, float screenHeight);
@@ -51,7 +51,8 @@ public:
 
     void onWindowResize(float width, float height);
     void update(float dt);
-    void render();
+    void render(VkCommandBuffer cmd);
+	UIRenderer& getRenderer() { return m_renderer; }
 
     IResourceManager& getResources() { return m_resources; }
 
