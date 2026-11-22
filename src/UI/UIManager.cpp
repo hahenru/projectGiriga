@@ -287,6 +287,18 @@ namespace {
         }
         return 1;
     }
+    // 輔助函數
+    void clampWindowsInContainer(UIContainer& container, float screenW, float screenH) {
+        for (const auto& child : container.getChildren()) {
+            if (!child) continue;
+            if (auto* win = dynamic_cast<UIWindow*>(child.get())) {
+                win->clampPosition(screenW, screenH);
+                win->markTransformDirty();
+            } else if (auto* subContainer = dynamic_cast<UIContainer*>(child.get())) {
+                clampWindowsInContainer(*subContainer, screenW, screenH);
+            }
+        }
+    }
 }
 
 UIManager::UIManager(VulkanContext& vkCtx, VkFormat colorFormat,
@@ -350,6 +362,7 @@ void UIManager::onWindowResize(float width, float height) {
             child->setSize(width, height);
         }
     }
+    clampWindowsInContainer(m_overlayUI, width, height);
 
     m_popupUI.setSize(width, height);
 }
@@ -378,10 +391,15 @@ void UIManager::bindEvents() {
     // C. 滑鼠移動事件派發（由頂層往下：Popup -> Overlay -> Scene）
     m_eventBus.subscribe<MouseMovedEvent>([this](MouseMovedEvent& e) {
         if (m_popupUI.handleMouseMove(e.x, e.y)) return;
-        if (m_overlayUI.handleMouseMove(e.x, e.y)) return;
+        if (m_overlayUI.handleMouseMove(e.x, e.y)) {
+            clampWindowsInContainer(m_overlayUI, m_screenWidth, m_screenHeight);
+            return;
+        }
 
         if (m_activeSceneUI && m_activeSceneUI->isVisible()) {
-            m_activeSceneUI->handleMouseMove(e.x, e.y);
+            if (m_activeSceneUI->handleMouseMove(e.x, e.y)) {
+                clampWindowsInContainer(*m_activeSceneUI, m_screenWidth, m_screenHeight);
+            }
         }
     }, getID());
 

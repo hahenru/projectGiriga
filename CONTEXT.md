@@ -10,6 +10,7 @@
 - **標頭與實作分離**：除模板與極短內聯存取器外，盡可能將宣告放在 `include/`（`.h`）、實作分離至 `src/`（`.cpp`），減少編譯耦合。
 - **傳統 Include Guard**：所有 `.h` 標頭檔**必須**使用傳統的 `#ifndef GIRIGARA_MODULE_FILENAME_H` / `#define` / `#endif`（**禁用** `#pragma once`）。
 - **事件驅動優先 (`EventBus`)**：子系統之間能走事件系統就盡量透過 `EventBus` 發布/訂閱事件解耦，避免直接跨模組持有指標或強耦合；物件銷毀時使用 `Identifiable` / `Depersonalization` 搭配 `unsubscribeByOwner(getID())` 退訂。
+- **鍵盤滑鼠事件的偵測**：一律走事件匯流排，避免任何UI耦合了GLFW。
 - **資料與邏輯分離**：資料結構（如設定表、UI 屬性表 `UIPropMap`、事件結構體）與業務邏輯處理分離，避免把狀態與複雜邏輯混寫在單一巨型類別中。
 - **現代 C++23 與 RAII**：
   - 使用 **C++23 或以上標準**（`-std=c++23`）。

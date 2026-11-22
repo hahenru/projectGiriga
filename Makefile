@@ -210,7 +210,7 @@ DEPS = $(LINUX_CLIENT_OBJS:.o=.d) $(LINUX_SERVER_OBJS:.o=.d) $(LINUX_ENGINE_OBJS
 # ==========================================
 # 總匯編譯入口
 # ==========================================
-all: linux-all win64-all flatpak
+all: linux-all win64-all
 
 # ==========================================
 # [1] Linux 原生建置流程 (build/linux/)

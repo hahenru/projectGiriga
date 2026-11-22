@@ -1,6 +1,6 @@
 #include <UI/UIWindow.h>
 #include <Renderer/UIRenderer.h>
-#include <GLFW/glfw3.h>
+#include <Core/InputCode.h>
 #include <algorithm>
 
 class UIRenderer;
@@ -114,25 +114,11 @@ void UIWindow::clampPosition(float screenW, float screenH) {
 bool UIWindow::handleMouseMove(double x, double y) {
     if (!m_visible) return false;
 
-    // 拖曳處理
+    // 拖曳處理：純粹更新座標與標髒，邊界夾制統一由 UIManager 依據正確的 m_screenWidth/Height 執行
     if (m_isDragging) {
         m_x = static_cast<float>(x - m_dragOffsetX);
         m_y = static_cast<float>(y - m_dragOffsetY);
-
-		/**
-		* TODO: 之後要把這個hard code移除掉，滑鼠的檢查，直接走Event System.
-		*/
-        GLFWwindow* currentContext = glfwGetCurrentContext();
-        int winW = 800, winH = 600;
-        if (currentContext) {
-            glfwGetFramebufferSize(currentContext, &winW, &winH);
-        }
-
-        clampPosition(static_cast<float>(winW), static_cast<float>(winH));
-		
-		// ★ 核心修復：座標更新後立即標記髒，通知渲染管線與所有子元件重算全局座標！
         markTransformDirty();
-		
         return true;
     }
 
@@ -154,7 +140,7 @@ bool UIWindow::handleMouseButton(int button, int action, int mods, double x, dou
         return true;
     }
 
-    if (action == GLFW_PRESS && button == GLFW_MOUSE_BUTTON_LEFT) {
+    if (action == InputCode::ActionPress && button == InputCode::MouseLeft) {
         if (isInsideTitleBar(x, y)) {
             m_isDragging = true;
             m_dragOffsetX = x - m_x;
@@ -169,7 +155,7 @@ bool UIWindow::handleMouseButton(int button, int action, int mods, double x, dou
         if (contains(x, y)) {
             return true;
         }
-    } else if (action == GLFW_RELEASE && button == GLFW_MOUSE_BUTTON_LEFT) {
+    } else if (action == InputCode::ActionRelease && button == InputCode::MouseLeft) {
         if (m_isDragging) {
             m_isDragging = false;
             return true;
@@ -182,15 +168,15 @@ bool UIWindow::handleMouseButton(int button, int action, int mods, double x, dou
     return false;
 }
 
-bool UIWindow::handleKey(int key, int /*scancode*/, int action, int /*mods*/) {
+bool UIWindow::handleKey(int key, int scancode, int action, int mods) {
     if (!m_visible) return false;
 
-    if (m_isFocused && isCloseOnEscEnabled() && key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+    if (m_isFocused && isCloseOnEscEnabled() && key == InputCode::KeyEscape && action == InputCode::ActionPress) {
         setVisible(false);
         return true;
     }
 
-    return m_container.handleKey(key, 0, action, 0);
+    return m_container.handleKey(key, scancode, action, mods);
 }
 
 void UIWindow::markTransformDirty() {
